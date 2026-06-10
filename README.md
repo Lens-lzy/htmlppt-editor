@@ -61,38 +61,30 @@ npm run build:single  # 打成单文件 dist/index.html（双击即用）
 
 ## 部署到自己的服务器
 
-这是个纯静态站点（构建产物在 `dist/`），随便一个静态服务器就能托管。
+这是个纯静态站点（构建产物在 `dist/`），用 nginx 直接托管。
+默认部署到 **https://web.bonjor.fun/html-editor/**（即 `/var/www/html/html-editor/`）。
 
 **首次部署（在 Ubuntu 服务器上）：**
 
 ```bash
+cd /var/www/html                      # 或任意你放代码的目录
 git clone https://github.com/Lens-lzy/htmlppt-editor.git
 cd htmlppt-editor
 # 需要 Node.js（建议 18+）。没装的话：
 #   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
-WEB_ROOT=/var/www/htmlppt ./deploy.sh    # 构建并同步到 /var/www/htmlppt
+./deploy.sh                           # 默认构建并同步到 /var/www/html/html-editor
 ```
 
-然后让 nginx 指向那个目录（`/etc/nginx/sites-available/` 里加一段）：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;          # 换成你的域名或公网 IP
-    root /var/www/htmlppt;
-    index index.html;
-    location / { try_files $uri $uri/ /index.html; }
-}
-```
-
-`sudo nginx -t && sudo systemctl reload nginx` 即生效。
+由于已有 `web.bonjor.fun` 的 nginx 站点把 `root` 指向 `/var/www/html`，
+子目录 `html-editor/` 会被自动当成静态资源服务，**无需改 nginx**，
+访问 `https://web.bonjor.fun/html-editor/` 即可。
 
 **后续更新：** 本地改完 `git push`，服务器上重跑一行：
 
 ```bash
-cd htmlppt-editor && WEB_ROOT=/var/www/htmlppt ./deploy.sh
+cd htmlppt-editor && ./deploy.sh
 ```
 
-`deploy.sh` 会 `git pull` → 装依赖 → 构建 → `rsync` 到 `WEB_ROOT`。
-若部署在子路径（如 `https://站点/ppt/`），加 `BASE_PATH=/ppt/` 一起传给脚本。
-不设 `WEB_ROOT` 时只构建到 `./dist`，可把 nginx 的 root 直接指到该 `dist`。
+`deploy.sh` 会 `git pull` → 装依赖 → 用 `base=/html-editor/` 构建 → `rsync` 到 `/var/www/html/html-editor`。
+想换路径临时覆盖即可，如 `BASE_PATH=/ppt/ WEB_ROOT=/var/www/html/ppt ./deploy.sh`
+（`base` 必须等于访问子路径，首尾都带 `/`，否则页面资源会 404）。

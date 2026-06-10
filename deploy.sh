@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 #
 # 服务器更新脚本（在 Ubuntu 服务器上跑）
-#   拉取最新代码 -> 安装依赖 -> 构建 -> （可选）同步到 web 根目录
+#   拉取最新代码 -> 安装依赖 -> 构建 -> 同步到 nginx web 目录
 #
-# 用法：
-#   ./deploy.sh                                   # 构建到 ./dist
-#   WEB_ROOT=/var/www/htmlppt ./deploy.sh         # 构建后同步到 /var/www/htmlppt
-#   BASE_PATH=/ppt/ WEB_ROOT=/var/www/x ./deploy.sh   # 部署到子路径 /ppt/
+# 默认部署到 https://web.bonjor.fun/html-editor/
+# 直接运行即可：  ./deploy.sh
+# 想改路径/目录可临时覆盖，如：  BASE_PATH=/ppt/ WEB_ROOT=/var/www/html/ppt ./deploy.sh
 #
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# 部署在子路径下，base 必须等于该子路径（首尾都带 /），否则页面资源会 404
+export BASE_PATH="${BASE_PATH:-/html-editor/}"
+WEB_ROOT="${WEB_ROOT:-/var/www/html/html-editor}"
 
 echo "==> [1/4] 拉取最新代码"
 git pull --ff-only
@@ -21,17 +24,11 @@ else
   npm install
 fi
 
-echo "==> [3/4] 构建（base=${BASE_PATH:-/}）"
+echo "==> [3/4] 构建（base=$BASE_PATH）"
 npm run build
 
-if [ -n "${WEB_ROOT:-}" ]; then
-  echo "==> [4/4] 同步 dist/ 到 $WEB_ROOT"
-  mkdir -p "$WEB_ROOT"
-  rsync -a --delete dist/ "$WEB_ROOT"/
-  echo "==> 已部署到 $WEB_ROOT"
-else
-  echo "==> [4/4] 未设置 WEB_ROOT，跳过同步。静态文件已生成在 ./dist"
-  echo "    把 nginx 的 root 指到这个 dist 目录，或设置 WEB_ROOT 重跑。"
-fi
+echo "==> [4/4] 同步 dist/ 到 $WEB_ROOT"
+mkdir -p "$WEB_ROOT"
+rsync -a --delete dist/ "$WEB_ROOT"/
 
-echo "==> 完成 ✅"
+echo "==> 完成 ✅  访问：https://web.bonjor.fun${BASE_PATH}"
