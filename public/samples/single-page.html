@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>说明页示例</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", system-ui, sans-serif; color: #1f2430; background: #f6f7fb; }
+  .hero { padding: 64px 48px; background: linear-gradient(135deg, #4c8dff, #7b5cff); color: #fff; }
+  .hero h1 { font-size: 44px; font-weight: 800; letter-spacing: -0.5px; }
+  .hero p { font-size: 18px; margin-top: 14px; opacity: 0.92; max-width: 640px; line-height: 1.6; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px; }
+  .cards { display: flex; gap: 20px; flex-wrap: wrap; }
+  .card { flex: 1 1 240px; background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 6px 20px rgba(30,40,70,0.08); }
+  .card .ico { font-size: 32px; }
+  .card h3 { margin-top: 12px; font-size: 18px; }
+  .card p { margin-top: 8px; color: #5b6172; line-height: 1.6; }
+  h2 { font-size: 28px; margin: 40px 0 16px; }
+  .lead { color: #5b6172; line-height: 1.8; font-size: 16px; }
+  code { background: #eceefb; padding: 2px 6px; border-radius: 4px; color: #5b3cff; }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <h1>把 HTML 变成人人可改</h1>
+    <p>这是一个用于测试可视化编辑器的说明页。点选任意标题、段落或卡片，拖动它、缩放它、改它的颜色和字号。</p>
+  </header>
+  <main class="wrap">
+    <h2>三个核心能力</h2>
+    <p class="lead">下面这些卡片都是普通的 HTML 元素，你可以直接在画布上编辑它们，无需写一行代码。</p>
+    <section class="cards">
+      <div class="card">
+        <div class="ico">🎯</div>
+        <h3>点选即编辑</h3>
+        <p>鼠标点一下就选中元素，右侧面板实时显示并修改它的样式。</p>
+      </div>
+      <div class="card">
+        <div class="ico">🖐️</div>
+        <h3>拖动与缩放</h3>
+        <p>抓住元素拖动位置，拉动角点缩放大小，所见即所得。</p>
+      </div>
+      <div class="card">
+        <div class="ico">💾</div>
+        <h3>导出干净 HTML</h3>
+        <p>编辑成果以内联样式保存，结构不变，仍是可读的 <code>.html</code>。</p>
+      </div>
+    </section>
+    <h2>它是怎么工作的</h2>
+    <p class="lead">编辑器把你的改动写成元素上的内联样式覆盖，导出时剥离一切编辑器痕迹，只保留你的修改。</p>
+  </main>
+</body>
+</html>

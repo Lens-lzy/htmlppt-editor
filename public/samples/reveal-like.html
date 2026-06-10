@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>多页幻灯片示例</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", system-ui, sans-serif; background: #0f1220; }
+  .slide {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 80px;
+    color: #fff;
+  }
+  .slide.cover { background: linear-gradient(135deg, #4c8dff, #7b5cff); }
+  .slide.dark { background: #14162a; }
+  .slide.teal { background: linear-gradient(135deg, #0ea5a5, #1e6f9f); }
+  h1 { font-size: 56px; font-weight: 800; letter-spacing: -1px; }
+  h2 { font-size: 38px; font-weight: 700; margin-bottom: 20px; }
+  p { font-size: 20px; line-height: 1.7; opacity: 0.9; max-width: 700px; }
+  .tag { font-size: 16px; letter-spacing: 4px; opacity: 0.7; margin-bottom: 18px; }
+  ul { margin-top: 16px; line-height: 2; font-size: 20px; }
+</style>
+</head>
+<body>
+  <section class="slide cover">
+    <div class="tag">PRODUCT DECK</div>
+    <h1>可视化 HTML 编辑器</h1>
+    <p>给 AI 生成的幻灯片做最后一公里的精修 —— 不写代码，点选即改。</p>
+  </section>
+  <section class="slide dark">
+    <h2>为什么需要它</h2>
+    <p>AI 一次就能生成漂亮的 HTML 幻灯片，但要微调一个字、挪一张图、换个颜色，不懂代码的人只能反复对话。</p>
+  </section>
+  <section class="slide teal">
+    <h2>它能做什么</h2>
+    <ul>
+      <li>· 点选任意元素</li>
+      <li>· 拖动、缩放、改文字</li>
+      <li>· 调字体 / 颜色 / 阴影 / 间距</li>
+      <li>· 导出干净的 HTML</li>
+    </ul>
+  </section>
+  <section class="slide dark">
+    <h2>开始使用</h2>
+    <p>把这个文件拖进编辑器，左下角会出现每一页的缩略图，点缩略图即可切换、复制、删除、重排。</p>
+  </section>
+</body>
+</html>
