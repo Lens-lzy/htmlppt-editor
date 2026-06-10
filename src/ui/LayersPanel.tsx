@@ -28,7 +28,7 @@ function LayerRow({ node, depth }: { node: LayerNode; depth: number }) {
       <div
         class={'hve-layer-row' + (active ? ' on' : '')}
         style={{ paddingLeft: 8 + depth * 12 + 'px' }}
-        onClick={() => core.selectByEl(node.el)}
+        onClick={() => core.selectByEl(node.el, true)}
         title={node.label}
       >
         <span class="hve-layer-label">{node.label}</span>

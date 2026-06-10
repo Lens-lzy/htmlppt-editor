@@ -1,10 +1,7 @@
-import { useRef, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { canUndo, canRedo, fileName, slidesState } from './state'
 import { getCore } from './core-instance'
 import type { SlideDetectMode } from '../core/types'
-
-// 部署 base 路径（Vite 注入），保证示例资源在任意部署路径下都能取到
-const BASE = import.meta.env.BASE_URL
 
 const MODES: { value: SlideDetectMode; label: string }[] = [
   { value: 'auto', label: '自动识别' },
@@ -13,11 +10,18 @@ const MODES: { value: SlideDetectMode; label: string }[] = [
   { value: 'single', label: '整篇单页' },
 ]
 
+type SearchRes = { count: number; index: number }
+
 export function Toolbar() {
   const core = getCore()
   const [msg, setMsg] = useState('')
   const [selector, setSelector] = useState('')
+  const [openMenu, setOpenMenu] = useState(false)
+  const [q, setQ] = useState('')
+  const [res, setRes] = useState<SearchRes>({ count: 0, index: 0 })
   const dirInput = useRef<HTMLInputElement>(null)
+  const htmlInput = useRef<HTMLInputElement>(null)
+  const openWrap = useRef<HTMLDivElement>(null)
   const mode = slidesState.value.mode
 
   const flash = (m: string) => {
@@ -25,15 +29,38 @@ export function Toolbar() {
     setTimeout(() => setMsg(''), 2200)
   }
 
-  const onOpen = async () => {
-    try {
-      await core.openViaPicker()
-    } catch (e) {
-      flash((e as Error).message)
+  // 换文件后清空搜索框
+  useEffect(() => {
+    setQ('')
+    setRes({ count: 0, index: 0 })
+  }, [fileName.value])
+
+  // 点击「打开」菜单外部时关闭
+  useEffect(() => {
+    if (!openMenu) return
+    const onDoc = (e: MouseEvent) => {
+      if (openWrap.current && !openWrap.current.contains(e.target as Node)) setOpenMenu(false)
+    }
+    window.addEventListener('mousedown', onDoc)
+    return () => window.removeEventListener('mousedown', onDoc)
+  }, [openMenu])
+
+  const openHtml = async () => {
+    setOpenMenu(false)
+    if (core.canUseFS) {
+      try {
+        await core.openViaPicker()
+      } catch (e) {
+        const m = (e as Error).message
+        if (!/abort/i.test(m)) flash(m)
+      }
+    } else {
+      htmlInput.current?.click()
     }
   }
 
-  const onOpenFolder = async () => {
+  const openFolder = async () => {
+    setOpenMenu(false)
     if (core.canPickDir) {
       try {
         await core.openFolder()
@@ -70,26 +97,46 @@ export function Toolbar() {
     }
   }
 
+  const runSearch = (val: string) => {
+    setQ(val)
+    setRes(core.search(val))
+  }
+  const onSearchKey = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      setRes(e.shiftKey ? core.searchPrev() : core.searchNext())
+    }
+  }
+
   return (
     <header class="hve-toolbar">
       <span class="hve-logo">HTMLPPT 编辑器</span>
 
       <div class="hve-tb-group">
-        <button onClick={onOpen} title="打开本地 HTML 文件">📂 打开</button>
-        <button onClick={onOpenFolder} title="打开整个文件夹：HTML 连同它引用的图片/CSS 一起加载">
-          📁 打开文件夹
-        </button>
-        <label class="hve-file-btn" title="拖拽或选择文件">
-          选择文件
-          <input
-            type="file"
-            accept=".html,.htm,text/html"
-            onChange={(e) => {
-              const f = (e.target as HTMLInputElement).files?.[0]
-              if (f) core.openFromFile(f)
-            }}
-          />
-        </label>
+        <div class="hve-open" ref={openWrap}>
+          <button onClick={() => setOpenMenu((v) => !v)} title="打开 HTML 文件或整个文件夹">
+            📂 打开 ▾
+          </button>
+          {openMenu && (
+            <div class="hve-menu">
+              <button class="hve-menu-item" onClick={openHtml}>📄 打开 HTML 文件</button>
+              <button class="hve-menu-item" onClick={openFolder}>
+                📁 打开文件夹（含图片/CSS）
+              </button>
+            </div>
+          )}
+        </div>
+        {/* 不支持 File System Access API 时的兜底 input */}
+        <input
+          ref={htmlInput}
+          type="file"
+          accept=".html,.htm,text/html"
+          style="display:none"
+          onChange={(e) => {
+            const f = (e.target as HTMLInputElement).files?.[0]
+            if (f) core.openFromFile(f)
+          }}
+        />
         <input
           ref={(el) => {
             dirInput.current = el
@@ -103,12 +150,6 @@ export function Toolbar() {
           style="display:none"
           onChange={onDirInput}
         />
-      </div>
-
-      <div class="hve-tb-group">
-        <span class="hve-tb-label">示例</span>
-        <button onClick={() => core.loadFromUrl(`${BASE}samples/single-page.html`, 'single-page.html')}>单页</button>
-        <button onClick={() => core.loadFromUrl(`${BASE}samples/reveal-like.html`, 'reveal-like.html')}>多页</button>
       </div>
 
       <div class="hve-tb-group">
@@ -136,6 +177,21 @@ export function Toolbar() {
             onKeyDown={(e) => e.key === 'Enter' && core.detectSlides('selector', selector)}
           />
         )}
+      </div>
+
+      <div class="hve-tb-group hve-search">
+        <input
+          class="hve-text hve-search-input"
+          placeholder="🔍 搜索页面内容"
+          value={q}
+          onInput={(e) => runSearch((e.target as HTMLInputElement).value)}
+          onKeyDown={onSearchKey}
+        />
+        <span class="hve-search-count">
+          {q ? (res.count ? `${res.index}/${res.count}` : '无结果') : ''}
+        </span>
+        <button disabled={!res.count} onClick={() => setRes(core.searchPrev())} title="上一个 Shift+Enter">↑</button>
+        <button disabled={!res.count} onClick={() => setRes(core.searchNext())} title="下一个 Enter">↓</button>
       </div>
 
       <div class="hve-tb-spacer" />

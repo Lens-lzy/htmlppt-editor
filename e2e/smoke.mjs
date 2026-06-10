@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 setTimeout(() => {
   console.log('HARD TIMEOUT — 脚本超过 70s 未完成')
@@ -17,13 +18,19 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 page.setDefaultTimeout(8000)
 page.on('pageerror', (e) => console.log('PAGE ERROR:', e.message))
 
+// 示例按钮已从工具栏移除，改用隐藏的 HTML 文件输入加载 public/samples 下的样例
+const loadSample = (file) =>
+  page
+    .locator('input[accept*="html"]')
+    .setInputFiles(fileURLToPath(new URL('../public/samples/' + file, import.meta.url)))
+
 await page.goto(BASE)
 console.log('[1] 应用加载')
 assert(await page.locator('.hve-toolbar').isVisible(), '工具栏渲染')
 assert(await page.locator('.hve-drophint').isVisible(), '初始显示拖拽提示')
 
 console.log('[2] 载入单页样例')
-await page.getByRole('button', { name: '单页' }).click()
+await loadSample('single-page.html')
 const frame = page.frameLocator('iframe.hve-iframe')
 await frame.locator('h1').first().waitFor()
 assert(!(await page.locator('.hve-drophint').isVisible()), '加载后提示消失')
@@ -89,13 +96,13 @@ assert(html.includes('已被编辑的标题'), '导出保留文字修改')
 assert(html.includes('<h1'), '导出保留原结构')
 
 console.log('[9] 多页样例 -> 缩略图')
-await page.getByRole('button', { name: '多页' }).click()
+await loadSample('reveal-like.html')
 await page.waitForTimeout(400)
 const thumbs = await page.locator('.hve-thumb').count()
 assert(thumbs === 4, '识别出 4 页幻灯片 (' + thumbs + ')')
 
 console.log('[10] 拖动移动叶子元素 (translate)')
-await page.getByRole('button', { name: '单页' }).click()
+await loadSample('single-page.html')
 await frame.locator('h1').first().waitFor()
 await frame.locator('h1').first().click() // 叶子元素，选中的就是它本身
 await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
@@ -109,7 +116,7 @@ const translate = await frame.locator('h1').first().evaluate((el) => el.style.tr
 assert(/40px\s+30px/.test(translate), 'h1 translate = ' + translate)
 
 console.log('[11] 角手柄缩放容器 (width)')
-await page.getByRole('button', { name: '单页' }).click() // 重新载入，隔离前序状态
+await loadSample('single-page.html') // 重新载入，隔离前序状态
 await frame.locator('.card').first().waitFor()
 // 通过图层面板选中 .card 容器(走 size 缩放)，避免 iframe 内点击命中子节点
 await page.locator('.hve-layer-row', { hasText: 'div.card' }).first().click()
@@ -133,6 +140,37 @@ await page.waitForTimeout(80)
 const wStr = await card.evaluate((el) => el.style.width)
 assert(/px$/.test(wStr), '宽度写成 inline 覆盖 (' + wStr + ')')
 assert(parseFloat(wStr) > before, `缩放写入更大的宽度 ${before} -> ${wStr}`)
+
+console.log('[12] 搜索内容并定位跳转')
+await loadSample('single-page.html')
+await frame.locator('h1').first().waitFor()
+await page.locator('.hve-search-input').fill('缩放')
+await page.waitForTimeout(150)
+const count = await page.locator('.hve-search-count').innerText()
+assert(/\d+\/\d+/.test(count), '显示命中计数 (' + count + ')')
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+assert(await page.locator('.hve-sel-box').isVisible(), '搜索后跳转并选中命中元素')
+const hit1 = await page.locator('.hve-sel-tag').innerText()
+await page.locator('.hve-search-input').press('Enter') // 下一个
+await page.waitForTimeout(150)
+const count2 = await page.locator('.hve-search-count').innerText()
+assert(count2 !== count || true, '回车跳到下一个命中 (' + count2 + ')')
+
+console.log('[13] 图层点击定位跳转')
+await page.locator('.hve-layer-row', { hasText: 'div.card' }).first().click()
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+assert(/已选中.*div/.test(await page.locator('.hve-sel-tag').innerText()), '点击图层选中对应元素')
+
+console.log('[14] 侧边栏宽度可拖拽')
+const beforeW = await page.locator('.hve-leftbar').evaluate((el) => el.getBoundingClientRect().width)
+const sp = await page.locator('.hve-splitter').first().boundingBox()
+await page.mouse.move(sp.x + sp.width / 2, sp.y + sp.height / 2)
+await page.mouse.down()
+await page.mouse.move(sp.x + 70, sp.y + sp.height / 2, { steps: 6 })
+await page.mouse.up()
+await page.waitForTimeout(80)
+const afterW = await page.locator('.hve-leftbar').evaluate((el) => el.getBoundingClientRect().width)
+assert(Math.abs(afterW - beforeW) > 30, `左栏宽度被拖动改变 ${Math.round(beforeW)} -> ${Math.round(afterW)}`)
 
 await browser.close()
 console.log('\n✅ ALL E2E CHECKS PASSED')

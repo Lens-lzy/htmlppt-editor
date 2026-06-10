@@ -62,6 +62,8 @@ export class EditorCore {
   private handle?: FileSystemFileHandle
   private bundle: AssetBundle | null = null
   private nodeCount = 0
+  private searchMatches: HTMLElement[] = []
+  private searchIdx = -1
 
   mount(container: HTMLElement): void {
     const getZoom = () => this.zoom
@@ -154,6 +156,8 @@ export class EditorCore {
     this.model.reset()
     this.history.reset()
     this.selection.deselect()
+    this.searchMatches = []
+    this.searchIdx = -1
     this.fileName = name || 'edited.html'
     await this.host.load(html)
     this.nodeCount = this.host.doc.querySelectorAll('*').length
@@ -219,12 +223,76 @@ export class EditorCore {
     this.applyStyle(prop, '')
   }
 
-  selectByEl(el: HTMLElement): void {
+  selectByEl(el: HTMLElement, reveal = false): void {
     this.selection.select(el)
+    if (reveal) this.revealEl(el)
+  }
+
+  /** 把元素滚动到 iframe 视口中央（图层点击 / 搜索跳转用） */
+  private revealEl(el: HTMLElement): void {
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+    } catch {
+      el.scrollIntoView()
+    }
   }
 
   getSelectedEl(): HTMLElement | null {
     return this.selection.selected
+  }
+
+  // ---------- 搜索定位 ----------
+
+  /** 搜索页面文本，定位到第一个命中。返回 {命中数, 当前序号(1基)} */
+  search(query: string): { count: number; index: number } {
+    this.searchMatches = []
+    this.searchIdx = -1
+    const q = query.trim().toLowerCase()
+    if (!q || !this.host?.doc?.body) return this.searchStatus()
+    const doc = this.host.doc
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+    const seen = new Set<HTMLElement>()
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      const text = node.textContent
+      if (!text || !text.toLowerCase().includes(q)) continue
+      const el = node.parentElement
+      if (!el || seen.has(el) || el.closest('script, style')) continue
+      seen.add(el)
+      this.searchMatches.push(el)
+    }
+    if (this.searchMatches.length) {
+      this.searchIdx = 0
+      this.gotoMatch()
+    }
+    return this.searchStatus()
+  }
+
+  searchNext(): { count: number; index: number } {
+    if (this.searchMatches.length) {
+      this.searchIdx = (this.searchIdx + 1) % this.searchMatches.length
+      this.gotoMatch()
+    }
+    return this.searchStatus()
+  }
+
+  searchPrev(): { count: number; index: number } {
+    if (this.searchMatches.length) {
+      const n = this.searchMatches.length
+      this.searchIdx = (this.searchIdx - 1 + n) % n
+      this.gotoMatch()
+    }
+    return this.searchStatus()
+  }
+
+  private gotoMatch(): void {
+    const el = this.searchMatches[this.searchIdx]
+    if (el && el.isConnected) this.selectByEl(el, true)
+  }
+
+  private searchStatus(): { count: number; index: number } {
+    const count = this.searchMatches.length
+    return { count, index: count ? this.searchIdx + 1 : 0 }
   }
 
   // ---------- 引用文件（图片来源 / 背景图） ----------

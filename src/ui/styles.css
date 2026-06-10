@@ -113,6 +113,51 @@ button:disabled {
   width: 120px;
 }
 
+/* 「打开」下拉菜单 */
+.hve-open {
+  position: relative;
+}
+.hve-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  min-width: 210px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.hve-menu-item {
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 7px 10px;
+  border-radius: 6px;
+}
+.hve-menu-item:hover {
+  background: var(--bg3);
+  border-color: transparent;
+}
+
+/* 搜索 */
+.hve-search-input {
+  width: 150px;
+}
+.hve-search-count {
+  color: var(--text-dim);
+  font-size: 12px;
+  min-width: 46px;
+  text-align: center;
+}
+.hve-search button {
+  padding: 4px 9px;
+}
+
 /* ---------- Main 3 columns ---------- */
 .hve-main {
   flex: 1 1 auto;
@@ -120,20 +165,36 @@ button:disabled {
   min-height: 0;
 }
 .hve-leftbar {
-  flex: 0 0 220px;
+  flex: 0 0 var(--left-w, 220px);
   background: var(--bg2);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0; /* 否则内容会把面板撑宽、并阻止拖窄 */
+  overflow: hidden;
 }
 .hve-rightbar {
-  flex: 0 0 280px;
+  flex: 0 0 var(--right-w, 280px);
   background: var(--bg2);
   border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+/* 侧栏与画布之间的可拖拽分隔条 */
+.hve-splitter {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 5;
+}
+.hve-splitter:hover,
+.hve-splitter:active {
+  background: var(--accent);
 }
 .hve-panel-head {
   padding: 10px 12px;
