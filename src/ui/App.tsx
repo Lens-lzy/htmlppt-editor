@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'preact/hooks'
-import { loaded, editing } from './state'
+import { loaded, editing, codeOpen } from './state'
 import { getCore } from './core-instance'
 import { Toolbar } from './Toolbar'
 import { LayersPanel } from './LayersPanel'
 import { StylePanel } from './StylePanel/StylePanel'
 import { SlidesStrip } from './SlidesStrip'
+import { CodePanel } from './CodePanel'
 
 const LS_LEFT = 'hve-left-w'
 const LS_RIGHT = 'hve-right-w'
@@ -93,6 +94,7 @@ export function App() {
         <StylePanel />
       </div>
       <SlidesStrip />
+      {codeOpen.value && <CodePanel />}
     </div>
   )
 }

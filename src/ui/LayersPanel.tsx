@@ -1,6 +1,20 @@
 import { layerVersion, selectedEl } from './state'
 import { getCore } from './core-instance'
-import type { LayerNode } from '../core/EditorCore'
+import type { LayerNode, ContentKind } from '../core/EditorCore'
+
+const ICON: Record<ContentKind, string> = {
+  heading: '🅣',
+  text: '🔤',
+  image: '🖼️',
+  video: '🎬',
+  audio: '🔊',
+  link: '🔗',
+  button: '🔘',
+  list: '☰',
+  table: '▦',
+  quote: '❝',
+  embed: '🧩',
+}
 
 export function LayersPanel() {
   // 订阅：结构变化时重建
@@ -8,7 +22,7 @@ export function LayersPanel() {
   const tree = getCore().buildLayerTree()
   return (
     <aside class="hve-leftbar">
-      <div class="hve-panel-head">图层</div>
+      <div class="hve-panel-head">内容</div>
       <div class="hve-layers">
         {tree.length === 0 ? (
           <div class="hve-empty-hint">未加载内容</div>
@@ -31,6 +45,7 @@ function LayerRow({ node, depth }: { node: LayerNode; depth: number }) {
         onClick={() => core.selectByEl(node.el, true)}
         title={node.label}
       >
+        <span class="hve-layer-icon">{ICON[node.kind]}</span>
         <span class="hve-layer-label">{node.label}</span>
       </div>
       {node.children.map((c) => (

@@ -26,9 +26,23 @@ import {
 import { AssetBundle } from './io/AssetBundle'
 import type { SlideDetectMode } from './types'
 
+/** 图层节点的内容类型（面向用户，不暴露 div/section 等结构标签） */
+export type ContentKind =
+  | 'heading'
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'link'
+  | 'button'
+  | 'list'
+  | 'table'
+  | 'quote'
+  | 'embed'
+
 export interface LayerNode {
   el: HTMLElement
-  tag: string
+  kind: ContentKind
   label: string
   children: LayerNode[]
 }
@@ -411,24 +425,62 @@ export class EditorCore {
     this.slides.move(i, dir)
   }
 
-  // ---------- 图层树 ----------
+  // ---------- 图层树（内容导向：只列文字/图片/视频等，隐藏 div/section 等纯结构容器）----------
 
   buildLayerTree(): LayerNode[] {
     if (!this.host?.doc?.body) return []
     this.nodeCount = 0
-    return Array.from(this.host.doc.body.children)
-      .map((c) => this.toLayerNode(c as HTMLElement))
-      .filter((n): n is LayerNode => n !== null)
+    return this.collectContent(this.host.doc.body)
   }
 
-  private toLayerNode(el: HTMLElement): LayerNode | null {
-    if (this.nodeCount++ > MAX_LAYER_NODES) return null
-    const children: LayerNode[] = []
-    for (const c of Array.from(el.children)) {
-      const node = this.toLayerNode(c as HTMLElement)
-      if (node) children.push(node)
+  private collectContent(parent: HTMLElement): LayerNode[] {
+    const out: LayerNode[] = []
+    for (const c of Array.from(parent.children)) {
+      if (this.nodeCount++ > MAX_LAYER_NODES) break
+      const el = c as HTMLElement
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'BR') continue
+      const kind = classifyContent(el)
+      if (kind) {
+        // 内容元素：作为一个图层，递归收集其内部的内容元素作为子层
+        out.push({ el, kind, label: friendlyLabel(el, kind), children: this.collectContent(el) })
+      } else {
+        // 纯结构容器（div/section/...）：本身不展示，把内部内容上提到当前层
+        out.push(...this.collectContent(el))
+      }
     }
-    return { el, tag: el.tagName.toLowerCase(), label: labelFor(el), children }
+    return out
+  }
+
+  // ---------- 源码查看 / 定位 / 在线编辑 ----------
+
+  /** 当前文档的干净 HTML（文件夹模式会还原相对路径） */
+  getSourceHtml(): string {
+    return this.exportHtml()
+  }
+
+  /**
+   * 取干净 HTML，并定位当前选中元素在其中的行号。
+   * 做法：给选中元素临时打一个标记属性，序列化后找标记所在行，再把标记移除。
+   */
+  getSourceWithLocation(): { html: string; line: number } {
+    const el = this.selection.selected
+    const MARK = 'data-hve-loc'
+    if (el) el.setAttribute(MARK, '')
+    let html = this.exportHtml()
+    if (el) el.removeAttribute(MARK)
+    let line = 0
+    const idx = html.indexOf(MARK)
+    if (idx >= 0) {
+      line = html.slice(0, idx).split('\n').length
+      html = html.replace(/\s*data-hve-loc(?:="")?/, '')
+    }
+    return { html, line }
+  }
+
+  /** 应用在线编辑的 HTML 源码：重新载入渲染（会重置撤销栈与选中） */
+  async applySource(html: string): Promise<void> {
+    if (this.bundle) html = await this.bundle.rewriteHtmlString(html)
+    await this.loadHtml(html, this.fileName)
   }
 }
 
@@ -443,13 +495,56 @@ function pickFileViaInput(): Promise<File | null> {
   })
 }
 
-function labelFor(el: HTMLElement): string {
-  const tag = el.tagName.toLowerCase()
-  const cls = el.classList[0] ? '.' + el.classList[0] : ''
-  let text = ''
-  if (!el.children.length) {
-    const t = (el.textContent ?? '').trim()
-    if (t) text = ` 「${t.slice(0, 16)}${t.length > 16 ? '…' : ''}」`
+/** 元素是否有自己的（非空白）直接文字节点 */
+function hasOwnText(el: HTMLElement): boolean {
+  for (const n of Array.from(el.childNodes)) {
+    if (n.nodeType === 3 && (n.textContent ?? '').trim()) return true
   }
-  return `${tag}${cls}${text}`
+  return false
+}
+
+/** 把元素归类为面向用户的内容类型；纯结构容器返回 null（不进图层树） */
+function classifyContent(el: HTMLElement): ContentKind | null {
+  const tag = el.tagName
+  if (tag === 'IMG' || tag === 'PICTURE' || tag === 'SVG') return 'image'
+  if (tag === 'VIDEO') return 'video'
+  if (tag === 'AUDIO') return 'audio'
+  if (tag === 'IFRAME' || tag === 'CANVAS' || tag === 'OBJECT' || tag === 'EMBED') return 'embed'
+  if (/^H[1-6]$/.test(tag)) return 'heading'
+  if (tag === 'BLOCKQUOTE') return 'quote'
+  if (tag === 'TABLE') return 'table'
+  if (tag === 'UL' || tag === 'OL') return 'list'
+  if (tag === 'A') return 'link'
+  if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return 'button'
+  // 普通含文字元素：p / li / td / span / figcaption / 直接写了文字的 div 等
+  if (hasOwnText(el)) return 'text'
+  return null
+}
+
+const KIND_CN: Record<ContentKind, string> = {
+  heading: '标题',
+  text: '文字',
+  image: '图片',
+  video: '视频',
+  audio: '音频',
+  link: '链接',
+  button: '按钮',
+  list: '列表',
+  table: '表格',
+  quote: '引用',
+  embed: '嵌入内容',
+}
+
+/** 生成「类型 · 文字预览」的友好标签 */
+function friendlyLabel(el: HTMLElement, kind: ContentKind): string {
+  const name = KIND_CN[kind]
+  if (kind === 'image') {
+    const src = el.getAttribute('alt') || el.getAttribute('src') || ''
+    const file = src.split(/[\\/]/).pop() || ''
+    return file ? `${name} · ${file.slice(0, 22)}` : name
+  }
+  if (kind === 'video' || kind === 'audio' || kind === 'embed') return name
+  const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return name
+  return `${name} · ${text.slice(0, 18)}${text.length > 18 ? '…' : ''}`
 }

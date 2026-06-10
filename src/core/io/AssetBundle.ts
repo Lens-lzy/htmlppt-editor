@@ -60,6 +60,11 @@ export class AssetBundle {
     return this.rewriteHtml(await entry.text())
   }
 
+  /** 把任意 HTML 字符串里的相对引用改写成 blob（在线编辑后重新载入时用） */
+  async rewriteHtmlString(html: string): Promise<string> {
+    return this.rewriteHtml(html)
+  }
+
   private async rewriteHtml(html: string): Promise<string> {
     const dir = dirname(this.entryPath)
     const doc = new DOMParser().parseFromString(html, 'text/html')

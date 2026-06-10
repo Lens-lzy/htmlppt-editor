@@ -118,8 +118,8 @@ assert(/40px\s+30px/.test(translate), 'h1 translate = ' + translate)
 console.log('[11] 角手柄缩放容器 (width)')
 await loadSample('single-page.html') // 重新载入，隔离前序状态
 await frame.locator('.card').first().waitFor()
-// 通过图层面板选中 .card 容器(走 size 缩放)，避免 iframe 内点击命中子节点
-await page.locator('.hve-layer-row', { hasText: 'div.card' }).first().click()
+// 点 .card 的内边距处(无子节点命中)选中容器本身，走 size 缩放
+await frame.locator('.card').first().click({ position: { x: 6, y: 6 } })
 await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
 const card = frame.locator('.card').first()
 const before = await card.evaluate((el) => Math.round(el.getBoundingClientRect().width))
@@ -156,10 +156,15 @@ await page.waitForTimeout(150)
 const count2 = await page.locator('.hve-search-count').innerText()
 assert(count2 !== count || true, '回车跳到下一个命中 (' + count2 + ')')
 
-console.log('[13] 图层点击定位跳转')
-await page.locator('.hve-layer-row', { hasText: 'div.card' }).first().click()
+console.log('[13] 图层内容化 + 点击定位跳转')
+// 简化后的图层只显示「标题/文字/图片…」，不再有 div/section 等结构标签
+const layerTexts = await page.locator('.hve-layer-row').allInnerTexts()
+assert(layerTexts.length > 0, '图层有内容 (' + layerTexts.length + ' 行)')
+assert(!layerTexts.some((t) => /\bdiv\b|\bsection\b|\bspan\b/.test(t)), '图层不再出现 div/section/span')
+assert(layerTexts.some((t) => t.includes('标题')) && layerTexts.some((t) => t.includes('文字')), '出现「标题/文字」友好标签')
+await page.locator('.hve-layer-row', { hasText: '标题' }).first().click()
 await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
-assert(/已选中.*div/.test(await page.locator('.hve-sel-tag').innerText()), '点击图层选中对应元素')
+assert(/已选中.*h[1-6]/.test(await page.locator('.hve-sel-tag').innerText()), '点击「标题」图层选中对应标题元素')
 
 console.log('[14] 侧边栏宽度可拖拽')
 const beforeW = await page.locator('.hve-leftbar').evaluate((el) => el.getBoundingClientRect().width)
@@ -171,6 +176,33 @@ await page.mouse.up()
 await page.waitForTimeout(80)
 const afterW = await page.locator('.hve-leftbar').evaluate((el) => el.getBoundingClientRect().width)
 assert(Math.abs(afterW - beforeW) > 30, `左栏宽度被拖动改变 ${Math.round(beforeW)} -> ${Math.round(afterW)}`)
+
+console.log('[15] HTML 源码面板：查看 / 定位 / 应用')
+await loadSample('single-page.html')
+await frame.locator('h1').first().waitFor()
+// 经图层面板选中 h1（避免点击命中 iframe 上方 overlay）
+await page.locator('.hve-layer-row', { hasText: '标题' }).first().click()
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+await page.getByRole('button', { name: /代码/ }).click()
+await page.locator('.hve-code-area').waitFor({ state: 'visible' })
+const code = await page.locator('.hve-code-area').inputValue()
+assert(/<h1/.test(code) && code.includes('把 HTML 变成'), '源码面板显示当前 HTML')
+assert(!code.includes('data-hve'), '源码不含编辑器标记')
+// 选区应落在 h1 那一行（定位）
+await page.waitForTimeout(100)
+const selLine = await page.locator('.hve-code-area').evaluate((ta) => {
+  const upto = ta.value.slice(0, ta.selectionStart)
+  return ta.value.split('\n')[upto.split('\n').length - 1]
+})
+assert(/<h1/.test(selLine), '已定位到 h1 所在行 (' + selLine.trim().slice(0, 30) + ')')
+// 编辑源码并应用
+await page.locator('.hve-code-area').fill(code.replace('把 HTML 变成人人可改', '源码编辑生效了'))
+await page.getByRole('button', { name: /应用/ }).click()
+await page.waitForTimeout(300)
+assert((await frame.locator('h1').first().innerText()).includes('源码编辑生效了'), '应用源码后画布更新')
+await page.getByRole('button', { name: /关闭/ }).click()
+await page.locator('.hve-code-overlay').waitFor({ state: 'detached' })
+assert((await page.locator('.hve-code-overlay').count()) === 0, '关闭代码面板')
 
 await browser.close()
 console.log('\n✅ ALL E2E CHECKS PASSED')

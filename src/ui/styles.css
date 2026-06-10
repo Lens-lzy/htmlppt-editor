@@ -306,11 +306,13 @@ button:disabled {
 
 /* ---------- Layers ---------- */
 .hve-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   border-left: 2px solid transparent;
 }
 .hve-layer-row:hover {
@@ -320,8 +322,75 @@ button:disabled {
   background: rgba(76, 141, 255, 0.18);
   border-left-color: var(--accent);
 }
+.hve-layer-icon {
+  flex: 0 0 auto;
+  font-size: 13px;
+  width: 16px;
+  text-align: center;
+  opacity: 0.85;
+}
 .hve-layer-label {
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Code panel (HTML 源码) ---------- */
+.hve-code-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hve-code-panel {
+  width: min(1000px, 92vw);
+  height: min(80vh, 820px);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.hve-code-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.hve-code-title {
+  font-weight: 600;
+  margin-right: 4px;
+}
+.hve-code-area {
+  flex: 1 1 auto;
+  width: 100%;
+  resize: none;
+  border: none;
+  background: #15161b;
+  color: #d7dae0;
+  padding: 12px 14px;
+  font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  line-height: 20px;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+.hve-code-area:focus {
+  outline: none;
+}
+.hve-code-foot {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  color: var(--text-dim);
+  font-size: 12px;
+  border-top: 1px solid var(--line);
 }
 
 /* ---------- Style panel ---------- */

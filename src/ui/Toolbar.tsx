@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { canUndo, canRedo, fileName, slidesState } from './state'
+import { canUndo, canRedo, fileName, slidesState, codeOpen, loaded } from './state'
 import { getCore } from './core-instance'
 import type { SlideDetectMode } from '../core/types'
 
@@ -155,6 +155,13 @@ export function Toolbar() {
       <div class="hve-tb-group">
         <button disabled={!canUndo.value} onClick={() => core.undo()} title="撤销 Ctrl+Z">↶ 撤销</button>
         <button disabled={!canRedo.value} onClick={() => core.redo()} title="重做 Ctrl+Y">↷ 重做</button>
+        <button
+          disabled={!loaded.value}
+          onClick={() => (codeOpen.value = true)}
+          title="查看/编辑 HTML 源码，并定位选中元素所在代码行"
+        >
+          {'</> 代码'}
+        </button>
       </div>
 
       <div class="hve-tb-group">

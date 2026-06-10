@@ -12,6 +12,7 @@ export const canRedo = signal(false)
 export const editing = signal(false)
 export const selectedEl = signal<HTMLElement | null>(null)
 export const layerVersion = signal(0)
+export const codeOpen = signal(false)
 
 export const slidesState = signal<{
   slides: SlideInfo[]
