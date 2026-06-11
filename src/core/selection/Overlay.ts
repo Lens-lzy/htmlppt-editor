@@ -1,6 +1,6 @@
 import type { ViewRect } from '../types'
 import { toContainerSpace } from '../frame/coords'
-import type { Guide } from '../transform/snap'
+import { snapConfig, type Guide } from '../transform/snap'
 
 export type HandleDir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 const HANDLES: HandleDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
@@ -81,6 +81,7 @@ export class Overlay {
     const c = this.container.getBoundingClientRect()
     for (const g of guides) {
       const line = el('div', `hve-guide hve-guide-${g.orient}`)
+      line.style.background = snapConfig.color
       if (g.orient === 'v') {
         const x = f.left + g.pos * zoom - c.left
         const y0 = f.top + g.from * zoom - c.top

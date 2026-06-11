@@ -1,6 +1,5 @@
 import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 
 setTimeout(() => {
   console.log('HARD TIMEOUT — 脚本超过 70s 未完成')
@@ -18,18 +17,18 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 page.setDefaultTimeout(8000)
 page.on('pageerror', (e) => console.log('PAGE ERROR:', e.message))
 
-// 示例按钮已从工具栏移除，改用隐藏的 HTML 文件输入加载 public/samples 下的样例。
-// 先清空再设值，保证即便连续加载同一文件也会触发 change 事件、真正重新渲染。
-const loadSample = async (file) => {
-  const input = page.locator('input[accept*="html"]')
-  await input.setInputFiles([])
-  await input.setInputFiles(fileURLToPath(new URL('../public/samples/' + file, import.meta.url)))
-}
+// 文件打开走原生 FS-API 选择器（headless 无法驱动），改为经 dev 暴露的内核直接加载样例。
+const loadSample = (file) =>
+  page.evaluate(async (name) => {
+    const html = await (await fetch('/samples/' + name)).text()
+    await window.__hveCore.openFromFile(new File([html], name, { type: 'text/html' }))
+  }, file)
 
 await page.goto(BASE)
 console.log('[1] 应用加载')
 assert(await page.locator('.hve-toolbar').isVisible(), '工具栏渲染')
 assert(await page.locator('.hve-drophint').isVisible(), '初始显示拖拽提示')
+assert((await page.locator('.hve-drophint-actions button').count()) >= 2, '中间主窗口有打开文件/文件夹按钮')
 
 console.log('[2] 载入单页样例')
 await loadSample('single-page.html')
@@ -248,6 +247,25 @@ await page.keyboard.press('Control+Shift+z')
 await page.waitForTimeout(80)
 const afterRedo2 = await frame.locator('h1').first().evaluate((el) => getComputedStyle(el).fontSize)
 assert(afterRedo2 === '50px', 'Shift 重做恢复字号 50px (' + afterRedo2 + ')')
+
+console.log('[18] 吸附开关：关闭后拖动不吸附')
+await loadSample('single-page.html')
+await frame.locator('.card').first().waitFor()
+await page.getByRole('button', { name: /吸附/ }).click() // 关闭吸附
+assert(/关/.test(await page.getByRole('button', { name: /吸附/ }).innerText()), '吸附开关切到关')
+const c1Top = await frame.locator('.card').first().evaluate((el) => el.getBoundingClientRect().top)
+await frame.locator('.card').nth(1).click({ position: { x: 6, y: 6 } })
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+const b3 = await page.locator('.hve-sel-box').boundingBox()
+await page.mouse.move(b3.x + b3.width / 2, b3.y + b3.height / 2)
+await page.mouse.down()
+await page.mouse.move(b3.x + b3.width / 2, b3.y + b3.height / 2 + 3, { steps: 3 })
+await page.mouse.up()
+await page.waitForTimeout(40)
+const c2Top = await frame.locator('.card').nth(1).evaluate((el) => el.getBoundingClientRect().top)
+assert(Math.abs(c2Top - c1Top) > 2, `关闭吸附后不再对齐 (Δ=${(c2Top - c1Top).toFixed(1)})`)
+assert((await page.locator('.hve-guide').count()) === 0, '关闭吸附时无辅助线')
+await page.getByRole('button', { name: /吸附/ }).click() // 还原
 
 await browser.close()
 console.log('\n✅ ALL E2E CHECKS PASSED')

@@ -231,7 +231,14 @@ button:disabled .hve-kbd {
   flex: 1 1 auto;
   position: relative;
   overflow: hidden;
-  background: #14151a;
+  /* 暗色「舞台」背景，空载时不再是突兀的大白底 */
+  background: radial-gradient(circle at 50% 38%, #2b2d36 0%, #1c1d23 60%, #16171c 100%);
+}
+/* 工具栏开关按钮（吸附等） */
+.hve-toggle.on {
+  background: var(--accent2);
+  border-color: var(--accent);
+  color: #fff;
 }
 .hve-stage {
   position: absolute;
@@ -323,6 +330,17 @@ button:disabled .hve-kbd {
 }
 .hve-drophint-sub {
   margin-top: 6px;
+}
+.hve-drophint-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  pointer-events: auto; /* 父层 pointer-events:none，这里恢复以便点击 */
+}
+.hve-drophint-actions button {
+  padding: 9px 16px;
+  font-size: 13px;
 }
 .hve-drophint-tip {
   margin-top: 16px;

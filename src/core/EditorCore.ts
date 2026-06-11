@@ -92,7 +92,14 @@ export class EditorCore {
       this.overlay,
       getZoom,
     )
-    this.resize = new ResizeController(this.selection, this.applier, this.history, this.host, getZoom)
+    this.resize = new ResizeController(
+      this.selection,
+      this.applier,
+      this.history,
+      this.host,
+      this.overlay,
+      getZoom,
+    )
     this.textEdit = new TextEditController(
       this.bus,
       this.host,
@@ -164,6 +171,26 @@ export class EditorCore {
 
   get canPickDir(): boolean {
     return supportsDirPicker()
+  }
+
+  /** 打开 HTML 文件：优先 File System Access，不支持则用隐藏 input 兜底 */
+  async openHtmlInteractive(): Promise<void> {
+    if (supportsFS()) {
+      await this.openViaPicker()
+      return
+    }
+    const f = await pickFileViaInput('.html,.htm,text/html')
+    if (f) await this.openFromFile(f)
+  }
+
+  /** 打开文件夹：优先 showDirectoryPicker，不支持则用 webkitdirectory 兜底 */
+  async openFolderInteractive(): Promise<void> {
+    if (supportsDirPicker()) {
+      await this.openFolder()
+      return
+    }
+    const files = await pickFolderViaInput()
+    if (files) await this.openFolderFromInput(files)
   }
 
   private resetSource(): void {
@@ -491,13 +518,26 @@ export class EditorCore {
   }
 }
 
-/** 没有 File System Access API 时，用隐藏 <input> 选单个图片 */
-function pickFileViaInput(): Promise<File | null> {
+/** 没有 File System Access API 时，用隐藏 <input> 选单个文件 */
+function pickFileViaInput(accept = 'image/*'): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = accept
     input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.click()
+  })
+}
+
+/** webkitdirectory 兜底：用隐藏 <input> 选一个文件夹 */
+function pickFolderViaInput(): Promise<FileList | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.setAttribute('webkitdirectory', '')
+    input.setAttribute('directory', '')
+    input.onchange = () => resolve(input.files && input.files.length ? input.files : null)
     input.click()
   })
 }

@@ -35,7 +35,12 @@ export interface SnapOut {
   guides: Guide[]
 }
 
-const SNAP_PX = 6
+/** 吸附配置（可调）：开关 / 阈值(屏幕像素) / 辅助线颜色。UI 与控制器共享同一份。 */
+export const snapConfig = {
+  enabled: true,
+  threshold: 6,
+  color: '#ff3b6b',
+}
 
 /** 采集文档里其它元素的对齐线（排除被拖元素及其子孙）。 */
 export function collectSnapTargets(doc: Document, dragged: HTMLElement): SnapSet {
@@ -71,8 +76,13 @@ export function collectSnapTargets(doc: Document, dragged: HTMLElement): SnapSet
  * 计算被拖元素当前矩形 r 对候选线的吸附结果。
  * 返回需要叠加到 translate 的偏移 (dx,dy) 与要画的辅助线（最多一纵一横）。
  */
-export function computeSnap(r: Rect, set: SnapSet, zoom: number): SnapOut {
-  const thr = SNAP_PX / Math.max(zoom, 1e-4)
+export function computeSnap(
+  r: Rect,
+  set: SnapSet,
+  zoom: number,
+  thresholdPx: number = snapConfig.threshold,
+): SnapOut {
+  const thr = thresholdPx / Math.max(zoom, 1e-4)
   const cx = (r.left + r.right) / 2
   const cy = (r.top + r.bottom) / 2
   const bx = best([r.left, cx, r.right], set.xs, thr)
@@ -97,6 +107,26 @@ export function computeSnap(r: Rect, set: SnapSet, zoom: number): SnapOut {
     })
   }
   return { dx, dy, guides }
+}
+
+/** 缩放用：某条边 value 找最近的候选对齐线（在阈值内），返回该候选线或 null */
+export function snapEdge(
+  value: number,
+  cands: Cand[],
+  zoom: number,
+  thresholdPx: number = snapConfig.threshold,
+): Cand | null {
+  const thr = thresholdPx / Math.max(zoom, 1e-4)
+  let best: Cand | null = null
+  let bestD = Infinity
+  for (const c of cands) {
+    const d = Math.abs(value - c.pos)
+    if (d <= thr && d < bestD) {
+      bestD = d
+      best = c
+    }
+  }
+  return best
 }
 
 /** 在若干被拖线里，找与候选线距离最近且在阈值内的一对 */

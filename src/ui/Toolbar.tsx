@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { canUndo, canRedo, fileName, slidesState, codeOpen, loaded } from './state'
+import { canUndo, canRedo, fileName, slidesState, codeOpen, loaded, snapOn } from './state'
 import { getCore } from './core-instance'
+import { snapConfig } from '../core/transform/snap'
 import type { SlideDetectMode } from '../core/types'
 
 // 平台相关快捷键展示：Mac 用 ⌘/⇧，其它用 Ctrl/Shift
@@ -24,8 +25,6 @@ export function Toolbar() {
   const [openMenu, setOpenMenu] = useState(false)
   const [q, setQ] = useState('')
   const [res, setRes] = useState<SearchRes>({ count: 0, index: 0 })
-  const dirInput = useRef<HTMLInputElement>(null)
-  const htmlInput = useRef<HTMLInputElement>(null)
   const openWrap = useRef<HTMLDivElement>(null)
   const mode = slidesState.value.mode
 
@@ -52,41 +51,27 @@ export function Toolbar() {
 
   const openHtml = async () => {
     setOpenMenu(false)
-    if (core.canUseFS) {
-      try {
-        await core.openViaPicker()
-      } catch (e) {
-        const m = (e as Error).message
-        if (!/abort/i.test(m)) flash(m)
-      }
-    } else {
-      htmlInput.current?.click()
+    try {
+      await core.openHtmlInteractive()
+    } catch (e) {
+      const m = (e as Error).message
+      if (!/abort/i.test(m)) flash(m)
     }
   }
 
   const openFolder = async () => {
     setOpenMenu(false)
-    if (core.canPickDir) {
-      try {
-        await core.openFolder()
-      } catch (e) {
-        const m = (e as Error).message
-        if (!/abort/i.test(m)) flash(m)
-      }
-    } else {
-      dirInput.current?.click()
+    try {
+      await core.openFolderInteractive()
+    } catch (e) {
+      const m = (e as Error).message
+      if (!/abort/i.test(m)) flash(m)
     }
   }
 
-  const onDirInput = async (e: Event) => {
-    const list = (e.target as HTMLInputElement).files
-    if (list && list.length) {
-      try {
-        await core.openFolderFromInput(list)
-      } catch (err) {
-        flash((err as Error).message)
-      }
-    }
+  const toggleSnap = () => {
+    snapConfig.enabled = !snapConfig.enabled
+    snapOn.value = snapConfig.enabled
   }
 
   const onSave = async () => {
@@ -131,30 +116,6 @@ export function Toolbar() {
             </div>
           )}
         </div>
-        {/* 不支持 File System Access API 时的兜底 input */}
-        <input
-          ref={htmlInput}
-          type="file"
-          accept=".html,.htm,text/html"
-          style="display:none"
-          onChange={(e) => {
-            const f = (e.target as HTMLInputElement).files?.[0]
-            if (f) core.openFromFile(f)
-          }}
-        />
-        <input
-          ref={(el) => {
-            dirInput.current = el
-            if (el) {
-              el.setAttribute('webkitdirectory', '')
-              el.setAttribute('directory', '')
-            }
-          }}
-          type="file"
-          multiple
-          style="display:none"
-          onChange={onDirInput}
-        />
       </div>
 
       <div class="hve-tb-group">
@@ -170,6 +131,13 @@ export function Toolbar() {
           title="查看/编辑 HTML 源码，并定位选中元素所在代码行"
         >
           {'</> 代码'}
+        </button>
+        <button
+          class={'hve-toggle' + (snapOn.value ? ' on' : '')}
+          onClick={toggleSnap}
+          title="拖动/缩放时吸附对齐（按住 Alt 可临时关闭）"
+        >
+          🧲 吸附{snapOn.value ? '开' : '关'}
         </button>
       </div>
 

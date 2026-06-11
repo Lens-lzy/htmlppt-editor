@@ -3,8 +3,9 @@ import type { StyleApplier } from '../style/StyleApplier'
 import type { History } from '../history/History'
 import type { FrameHost } from '../frame/FrameHost'
 import type { ResizeKind } from '../types'
-import type { HandleDir } from '../selection/Overlay'
+import type { Overlay, HandleDir } from '../selection/Overlay'
 import { MultiStylePatchCommand } from '../history/commands/StylePatchCommand'
+import { collectSnapTargets, snapEdge, snapConfig, type SnapSet, type Guide } from './snap'
 
 /** 按元素类型决定缩放改什么属性（难点 1） */
 export function classifyResize(el: HTMLElement, win: Window): ResizeKind {
@@ -39,12 +40,16 @@ export class ResizeController {
   private oldFont = ''
   private shift = false
   private active = false
+  private snapSet: SnapSet = { xs: [], ys: [] }
+  private left0 = 0
+  private top0 = 0
 
   constructor(
     private selection: SelectionController,
     private applier: StyleApplier,
     private history: History,
     private host: FrameHost,
+    private overlay: Overlay,
     private getZoom: () => number,
   ) {}
 
@@ -58,6 +63,8 @@ export class ResizeController {
     const rect = el.getBoundingClientRect()
     this.startW = rect.width
     this.startH = rect.height
+    this.left0 = rect.left
+    this.top0 = rect.top
     this.startFont = parseFloat(this.host.win.getComputedStyle(el).fontSize) || 16
     this.oldW = el.style.width
     this.oldH = el.style.height
@@ -65,6 +72,7 @@ export class ResizeController {
     this.startX = e.clientX
     this.startY = e.clientY
     this.active = true
+    this.snapSet = this.kind === 'size' ? collectSnapTargets(this.host.doc, el) : { xs: [], ys: [] }
     window.addEventListener('pointermove', this.onMove)
     window.addEventListener('pointerup', this.onUp)
     e.preventDefault()
@@ -94,8 +102,36 @@ export class ResizeController {
       if (this.shift && signX !== 0 && signY !== 0) {
         newH = newW / aspect
       }
+      // 吸附：把正在移动的右/下边对齐到其它元素的线（顶左锚定，故右=left0+W、下=top0+H）
+      const guides: Guide[] = []
+      const snapping = snapConfig.enabled && !e.altKey && !this.shift
+      if (snapping && signX !== 0) {
+        const cand = snapEdge(this.left0 + newW, this.snapSet.xs, z, snapConfig.threshold)
+        if (cand) {
+          newW = cand.pos - this.left0
+          guides.push({
+            orient: 'v',
+            pos: cand.pos,
+            from: Math.min(this.top0, cand.a),
+            to: Math.max(this.top0 + newH, cand.b),
+          })
+        }
+      }
+      if (snapping && signY !== 0) {
+        const cand = snapEdge(this.top0 + newH, this.snapSet.ys, z, snapConfig.threshold)
+        if (cand) {
+          newH = cand.pos - this.top0
+          guides.push({
+            orient: 'h',
+            pos: cand.pos,
+            from: Math.min(this.left0, cand.a),
+            to: Math.max(this.left0 + newW, cand.b),
+          })
+        }
+      }
       if (signX !== 0) this.applier.set(this.el, this.id, 'width', `${Math.max(MIN, Math.round(newW))}px`)
       if (signY !== 0) this.applier.set(this.el, this.id, 'height', `${Math.max(MIN, Math.round(newH))}px`)
+      this.overlay.showSnapGuides(guides, this.host.iframe, z)
     }
     this.selection.reposition()
   }
@@ -105,6 +141,7 @@ export class ResizeController {
     this.active = false
     window.removeEventListener('pointermove', this.onMove)
     window.removeEventListener('pointerup', this.onUp)
+    this.overlay.clearGuides()
 
     const changes =
       this.kind === 'font'

@@ -131,13 +131,20 @@ function Splitter({ onDrag, onEnd }: { onDrag: (dx: number) => void; onEnd?: () 
 }
 
 function DropHint() {
+  const core = getCore()
   return (
     <div class="hve-drophint">
       <div class="hve-drophint-box">
         <div class="hve-drophint-icon">🖼️</div>
         <div class="hve-drophint-title">把一个 HTML 文件拖到这里</div>
-        <div class="hve-drophint-sub">
-          或点击左上角「📂 打开」；HTML 引用了图片/CSS 时选「打开文件夹」
+        <div class="hve-drophint-sub">或选择打开方式：</div>
+        <div class="hve-drophint-actions">
+          <button class="hve-primary" onClick={() => core.openHtmlInteractive().catch(() => {})}>
+            📄 打开 HTML 文件
+          </button>
+          <button onClick={() => core.openFolderInteractive().catch(() => {})}>
+            📁 打开文件夹（含图片/CSS）
+          </button>
         </div>
         <div class="hve-drophint-tip">
           点选元素 · 拖动位置 · 角点缩放 · 双击改字 · 右栏调样式 · 保存回干净 HTML

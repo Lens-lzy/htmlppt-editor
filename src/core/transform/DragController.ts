@@ -4,7 +4,7 @@ import type { History } from '../history/History'
 import type { FrameHost } from '../frame/FrameHost'
 import type { Overlay } from '../selection/Overlay'
 import { MultiStylePatchCommand } from '../history/commands/StylePatchCommand'
-import { collectSnapTargets, computeSnap, type SnapSet } from './snap'
+import { collectSnapTargets, computeSnap, snapConfig, type SnapSet } from './snap'
 
 function parseTranslate(v: string): { x: number; y: number } {
   if (!v) return { x: 0, y: 0 }
@@ -64,8 +64,8 @@ export class DragController {
     let ny = this.startTy + (e.clientY - this.startY) / z
     // 先按光标位置放置，再测量矩形算吸附
     this.applier.set(this.el, this.id, 'translate', `${Math.round(nx)}px ${Math.round(ny)}px`)
-    if (!e.altKey) {
-      const snap = computeSnap(this.el.getBoundingClientRect(), this.snapSet, z)
+    if (snapConfig.enabled && !e.altKey) {
+      const snap = computeSnap(this.el.getBoundingClientRect(), this.snapSet, z, snapConfig.threshold)
       if (snap.dx || snap.dy) {
         nx += snap.dx
         ny += snap.dy

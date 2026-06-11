@@ -28,7 +28,9 @@ export class FrameHost {
     this.iframe = document.createElement('iframe')
     this.iframe.className = 'hve-iframe'
     this.iframe.setAttribute('sandbox', 'allow-same-origin')
-    this.iframe.style.cssText = 'width:100%;height:100%;border:none;background:#fff;display:block;'
+    // 未加载内容前隐藏 iframe，避免空白白底突兀（画布暗色 + 提示更协调）
+    this.iframe.style.cssText =
+      'width:100%;height:100%;border:none;background:#fff;display:block;visibility:hidden;'
     container.appendChild(this.iframe)
   }
 
@@ -36,6 +38,7 @@ export class FrameHost {
     return new Promise((resolve) => {
       const onLoad = () => {
         this.iframe.removeEventListener('load', onLoad)
+        this.iframe.style.visibility = 'visible'
         this.attachListeners()
         this.bus.emit('loaded')
         resolve()
