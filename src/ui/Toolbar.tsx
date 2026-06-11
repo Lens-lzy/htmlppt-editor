@@ -3,6 +3,11 @@ import { canUndo, canRedo, fileName, slidesState, codeOpen, loaded } from './sta
 import { getCore } from './core-instance'
 import type { SlideDetectMode } from '../core/types'
 
+// 平台相关快捷键展示：Mac 用 ⌘/⇧，其它用 Ctrl/Shift
+const IS_MAC = /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)
+const UNDO_KEY = IS_MAC ? '⌘Z' : 'Ctrl+Z'
+const REDO_KEY = IS_MAC ? '⇧⌘Z' : 'Ctrl+Shift+Z'
+
 const MODES: { value: SlideDetectMode; label: string }[] = [
   { value: 'auto', label: '自动识别' },
   { value: 'section', label: '按 section' },
@@ -153,8 +158,12 @@ export function Toolbar() {
       </div>
 
       <div class="hve-tb-group">
-        <button disabled={!canUndo.value} onClick={() => core.undo()} title="撤销 Ctrl+Z">↶ 撤销</button>
-        <button disabled={!canRedo.value} onClick={() => core.redo()} title="重做 Ctrl+Y">↷ 重做</button>
+        <button disabled={!canUndo.value} onClick={() => core.undo()} title={`撤销 ${UNDO_KEY}`}>
+          ↶ 撤销 <span class="hve-kbd">{UNDO_KEY}</span>
+        </button>
+        <button disabled={!canRedo.value} onClick={() => core.redo()} title={`重做 ${REDO_KEY}`}>
+          ↷ 重做 <span class="hve-kbd">{REDO_KEY}</span>
+        </button>
         <button
           disabled={!loaded.value}
           onClick={() => (codeOpen.value = true)}

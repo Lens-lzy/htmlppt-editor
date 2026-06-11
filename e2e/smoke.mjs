@@ -18,11 +18,13 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 page.setDefaultTimeout(8000)
 page.on('pageerror', (e) => console.log('PAGE ERROR:', e.message))
 
-// 示例按钮已从工具栏移除，改用隐藏的 HTML 文件输入加载 public/samples 下的样例
-const loadSample = (file) =>
-  page
-    .locator('input[accept*="html"]')
-    .setInputFiles(fileURLToPath(new URL('../public/samples/' + file, import.meta.url)))
+// 示例按钮已从工具栏移除，改用隐藏的 HTML 文件输入加载 public/samples 下的样例。
+// 先清空再设值，保证即便连续加载同一文件也会触发 change 事件、真正重新渲染。
+const loadSample = async (file) => {
+  const input = page.locator('input[accept*="html"]')
+  await input.setInputFiles([])
+  await input.setInputFiles(fileURLToPath(new URL('../public/samples/' + file, import.meta.url)))
+}
 
 await page.goto(BASE)
 console.log('[1] 应用加载')
@@ -107,10 +109,13 @@ await frame.locator('h1').first().waitFor()
 await frame.locator('h1').first().click() // 叶子元素，选中的就是它本身
 await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
 const box = await page.locator('.hve-sel-box').boundingBox()
+// 按住 Alt 关闭吸附，校验纯位移
+await page.keyboard.down('Alt')
 await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
 await page.mouse.down()
 await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 30, { steps: 6 })
 await page.mouse.up()
+await page.keyboard.up('Alt')
 await page.waitForTimeout(80)
 const translate = await frame.locator('h1').first().evaluate((el) => el.style.translate)
 assert(/40px\s+30px/.test(translate), 'h1 translate = ' + translate)
@@ -203,6 +208,46 @@ assert((await frame.locator('h1').first().innerText()).includes('源码编辑生
 await page.getByRole('button', { name: /关闭/ }).click()
 await page.locator('.hve-code-overlay').waitFor({ state: 'detached' })
 assert((await page.locator('.hve-code-overlay').count()) === 0, '关闭代码面板')
+
+console.log('[16] 拖动吸附对齐 + 辅助线')
+await loadSample('single-page.html')
+await frame.locator('.card').first().waitFor()
+// 选中第 2 张卡片（同排卡片顶边本是对齐的）
+await frame.locator('.card').nth(1).click({ position: { x: 6, y: 6 } })
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+const card1Top = await frame.locator('.card').first().evaluate((el) => el.getBoundingClientRect().top)
+const box2 = await page.locator('.hve-sel-box').boundingBox()
+// 向下拖 3px（在吸附阈值内、留足余量），应被吸附回与第 1 张卡片顶边对齐，并出现横向辅助线
+await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2)
+await page.mouse.down()
+await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2 + 3, { steps: 3 })
+await page.waitForTimeout(40)
+const guideShown = await page.locator('.hve-guide-h').count()
+assert(guideShown > 0, '拖到对齐位置出现横向辅助线 (' + guideShown + ')')
+await page.mouse.up()
+await page.waitForTimeout(40)
+const card2Top = await frame.locator('.card').nth(1).evaluate((el) => el.getBoundingClientRect().top)
+assert(Math.abs(card2Top - card1Top) < 1.5, `卡片顶边被吸附对齐 (Δ=${(card2Top - card1Top).toFixed(1)})`)
+assert((await page.locator('.hve-guide').count()) === 0, '松手后辅助线消失')
+
+console.log('[17] 撤销/重做快捷键提示 + Shift 重做')
+const undoTitle = await page.getByRole('button', { name: /撤销/ }).getAttribute('title')
+const redoTitle = await page.getByRole('button', { name: /重做/ }).getAttribute('title')
+assert(/⌘Z|Ctrl\+Z/.test(undoTitle || ''), '撤销按钮提示含快捷键 (' + undoTitle + ')')
+assert(/⇧⌘Z|Ctrl\+Shift\+Z/.test(redoTitle || ''), '重做按钮提示含 Shift 快捷键 (' + redoTitle + ')')
+// 选中 h1 改字号，验证 Shift 重做
+await page.locator('.hve-layer-row', { hasText: '标题' }).first().click()
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+await page.locator('.hve-num input[type=number]').first().fill('50')
+await page.waitForTimeout(80)
+await page.keyboard.press('Control+z')
+await page.waitForTimeout(80)
+const afterUndo2 = await frame.locator('h1').first().evaluate((el) => getComputedStyle(el).fontSize)
+assert(afterUndo2 !== '50px', '撤销后字号回退 (' + afterUndo2 + ')')
+await page.keyboard.press('Control+Shift+z')
+await page.waitForTimeout(80)
+const afterRedo2 = await frame.locator('h1').first().evaluate((el) => getComputedStyle(el).fontSize)
+assert(afterRedo2 === '50px', 'Shift 重做恢复字号 50px (' + afterRedo2 + ')')
 
 await browser.close()
 console.log('\n✅ ALL E2E CHECKS PASSED')

@@ -84,7 +84,14 @@ export class EditorCore {
     this.host = new FrameHost(container, this.bus, getZoom)
     this.overlay = new Overlay(container)
     this.selection = new SelectionController(this.bus, this.host, this.overlay, this.model)
-    this.drag = new DragController(this.selection, this.applier, this.history, getZoom)
+    this.drag = new DragController(
+      this.selection,
+      this.applier,
+      this.history,
+      this.host,
+      this.overlay,
+      getZoom,
+    )
     this.resize = new ResizeController(this.selection, this.applier, this.history, this.host, getZoom)
     this.textEdit = new TextEditController(
       this.bus,

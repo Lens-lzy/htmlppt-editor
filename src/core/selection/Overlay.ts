@@ -1,5 +1,6 @@
 import type { ViewRect } from '../types'
 import { toContainerSpace } from '../frame/coords'
+import type { Guide } from '../transform/snap'
 
 export type HandleDir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 const HANDLES: HandleDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
@@ -14,6 +15,7 @@ export class Overlay {
   private hoverBox: HTMLElement
   private selBox: HTMLElement
   private handles = new Map<HandleDir, HTMLElement>()
+  private guideEls: HTMLElement[] = []
 
   /** 抓住选择框主体开始拖动 */
   onSelectionPointerDown?: (e: PointerEvent) => void
@@ -69,6 +71,39 @@ export class Overlay {
   /** 文字编辑期间：隐藏手柄、让选择框不拦截指针，便于直接操作 iframe 元素 */
   setEditing(on: boolean): void {
     this.selBox.classList.toggle('hve-editing', on)
+  }
+
+  /** 绘制吸附辅助线（guides 为 iframe 坐标，按 iframe 位置与缩放换算到容器空间） */
+  showSnapGuides(guides: Guide[], iframeEl: HTMLIFrameElement, zoom: number): void {
+    this.clearGuides()
+    if (!guides.length) return
+    const f = iframeEl.getBoundingClientRect()
+    const c = this.container.getBoundingClientRect()
+    for (const g of guides) {
+      const line = el('div', `hve-guide hve-guide-${g.orient}`)
+      if (g.orient === 'v') {
+        const x = f.left + g.pos * zoom - c.left
+        const y0 = f.top + g.from * zoom - c.top
+        const y1 = f.top + g.to * zoom - c.top
+        line.style.left = `${x}px`
+        line.style.top = `${y0}px`
+        line.style.height = `${Math.max(0, y1 - y0)}px`
+      } else {
+        const y = f.top + g.pos * zoom - c.top
+        const x0 = f.left + g.from * zoom - c.left
+        const x1 = f.left + g.to * zoom - c.left
+        line.style.top = `${y}px`
+        line.style.left = `${x0}px`
+        line.style.width = `${Math.max(0, x1 - x0)}px`
+      }
+      this.layer.appendChild(line)
+      this.guideEls.push(line)
+    }
+  }
+
+  clearGuides(): void {
+    for (const e of this.guideEls) e.remove()
+    this.guideEls = []
   }
 }
 
