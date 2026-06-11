@@ -18,7 +18,6 @@ import {
   openViaPicker,
   openFolderViaPicker,
   readFolderFromInput,
-  saveToHandle,
   download,
   supportsFS,
   supportsDirPicker,
@@ -56,6 +55,7 @@ export interface RefSlot {
 }
 
 const MAX_LAYER_NODES = 4000
+const AUTO_SAVE_MS = 5 * 60 * 1000
 
 export class EditorCore {
   readonly bus = new EventBus()
@@ -78,6 +78,10 @@ export class EditorCore {
   private nodeCount = 0
   private searchMatches: HTMLElement[] = []
   private searchIdx = -1
+  private hasContent = false
+  private dirty = false
+  private lastSavedTs: number | null = null
+  private autoSaveTimer?: number
 
   mount(container: HTMLElement): void {
     const getZoom = () => this.zoom
@@ -127,6 +131,14 @@ export class EditorCore {
 
     // overlay 跟随滚动/尺寸变化
     this.bus.on('reposition', () => this.selection.reposition())
+
+    // 编辑即标脏；每 5 分钟自动保存缓存
+    this.bus.on('history-changed', () => {
+      this.dirty = true
+    })
+    this.autoSaveTimer = window.setInterval(() => {
+      if (this.hasContent && this.dirty) void this.saveCache()
+    }, AUTO_SAVE_MS)
   }
 
   // ---------- 文件 ----------
@@ -134,13 +146,13 @@ export class EditorCore {
   async openFromFile(file: File): Promise<void> {
     this.resetSource()
     const f = await readFile(file)
-    await this.loadHtml(f.html, f.name)
+    await this.loadHtml(f.html, f.name, true)
   }
 
   async loadFromUrl(url: string, name: string): Promise<void> {
     this.resetSource()
     const html = await (await fetch(url)).text()
-    await this.loadHtml(html, name)
+    await this.loadHtml(html, name, true)
   }
 
   async openViaPicker(): Promise<void> {
@@ -148,7 +160,7 @@ export class EditorCore {
     if (!f) return
     this.resetSource()
     this.handle = f.handle
-    await this.loadHtml(f.html, f.name)
+    await this.loadHtml(f.html, f.name, true)
   }
 
   /** 打开整个文件夹：入口 HTML + 同目录图片/CSS/字体一并读入并渲染 */
@@ -158,7 +170,7 @@ export class EditorCore {
     this.resetSource()
     this.bundle = new AssetBundle(raw)
     this.handle = raw.entryHandle
-    await this.loadHtml(await this.bundle.loadEntryHtml(), raw.entryName)
+    await this.loadHtml(await this.bundle.loadEntryHtml(), raw.entryName, true)
   }
 
   /** webkitdirectory 兜底（不支持 showDirectoryPicker 的浏览器） */
@@ -166,7 +178,7 @@ export class EditorCore {
     const raw = readFolderFromInput(list)
     this.resetSource()
     this.bundle = new AssetBundle(raw)
-    await this.loadHtml(await this.bundle.loadEntryHtml(), raw.entryName)
+    await this.loadHtml(await this.bundle.loadEntryHtml(), raw.entryName, true)
   }
 
   get canPickDir(): boolean {
@@ -199,7 +211,7 @@ export class EditorCore {
     this.bundle = null
   }
 
-  private async loadHtml(html: string, name: string): Promise<void> {
+  private async loadHtml(html: string, name: string, announce = false): Promise<void> {
     resetIds()
     this.model.reset()
     this.history.reset()
@@ -210,25 +222,110 @@ export class EditorCore {
     await this.host.load(html)
     this.nodeCount = this.host.doc.querySelectorAll('*').length
     this.slides.detect('auto')
+    this.hasContent = true
+    this.dirty = false
+    this.lastSavedTs = null
+    if (announce) this.announceCache()
   }
 
-  async save(): Promise<'saved' | 'downloaded'> {
-    const text = this.exportHtml()
-    if (this.handle) {
+  // ---------- 保存缓存 / 自动保存 / 导出 ----------
+
+  private cacheKey(): string {
+    return 'hve-cache:' + this.fileName
+  }
+  private cacheFileName(): string {
+    return this.fileName.replace(/\.html?$/i, '') + '.cache.html'
+  }
+
+  /** 保存缓存（手动 Ctrl/Cmd+S 与每 5 分钟自动调用）：写 localStorage，文件夹模式再写一份 .cache.html */
+  async saveCache(): Promise<number | null> {
+    if (!this.hasContent) return null
+    const html = this.exportHtml()
+    const ts = Date.now()
+    try {
+      localStorage.setItem(this.cacheKey(), JSON.stringify({ html, ts, name: this.fileName }))
+    } catch {
+      /* localStorage 不可用时忽略，仍尝试写文件 */
+    }
+    const dir = this.bundle?.dirHandle as any
+    if (dir) {
       try {
-        await saveToHandle(this.handle, text)
-        return 'saved'
+        const fh = await dir.getFileHandle(this.cacheFileName(), { create: true })
+        const w = await fh.createWritable()
+        await w.write(html)
+        await w.close()
       } catch {
-        download(this.fileName, text)
-        return 'downloaded'
+        /* 无写权限等：忽略，localStorage 已兜底 */
       }
     }
-    download(this.fileName, text)
+    this.lastSavedTs = ts
+    this.dirty = false
+    this.bus.emit('cache-saved', ts)
+    return ts
+  }
+
+  /** 打开文件时，若发现同名缓存则广播，UI 提示可恢复 */
+  private announceCache(): void {
+    let info: { ts: number } | null = null
+    try {
+      const raw = localStorage.getItem(this.cacheKey())
+      if (raw) {
+        const o = JSON.parse(raw)
+        if (o && typeof o.ts === 'number') info = { ts: o.ts }
+      }
+    } catch {
+      /* ignore */
+    }
+    this.bus.emit('cache-available', info)
+  }
+
+  /** 用上次自动保存的缓存覆盖当前内容 */
+  async restoreCache(): Promise<boolean> {
+    let raw: string | null = null
+    try {
+      raw = localStorage.getItem(this.cacheKey())
+    } catch {
+      /* ignore */
+    }
+    if (!raw) return false
+    let html: string
+    try {
+      html = JSON.parse(raw).html
+    } catch {
+      return false
+    }
+    if (this.bundle) html = await this.bundle.rewriteHtmlString(html)
+    await this.loadHtml(html, this.fileName)
+    this.bus.emit('cache-available', null)
+    return true
+  }
+
+  /** 导出（另存为）：优先 showSaveFilePicker 选位置，不支持/失败则下载 */
+  async exportSaveAs(): Promise<'saved' | 'downloaded' | 'canceled'> {
+    const html = this.exportHtml()
+    const name = this.fileName.replace(/\.html?$/i, '') + '.html'
+    const w = window as any
+    if (w.showSaveFilePicker) {
+      try {
+        const handle = await w.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: 'HTML', accept: { 'text/html': ['.html', '.htm'] } }],
+        })
+        const ws = await handle.createWritable()
+        await ws.write(html)
+        await ws.close()
+        return 'saved'
+      } catch (e) {
+        if (/abort/i.test((e as Error).message)) return 'canceled'
+        // 其它错误（如无头环境）退回下载
+      }
+    }
+    download(name, html)
     return 'downloaded'
   }
 
   exportDownload(): void {
-    download(this.fileName.replace(/\.html?$/i, '') + '.edited.html', this.exportHtml())
+    download(this.fileName.replace(/\.html?$/i, '') + '.html', this.exportHtml())
   }
 
   /** 序列化后把 blob: URL 还原回原始相对路径（文件夹模式） */

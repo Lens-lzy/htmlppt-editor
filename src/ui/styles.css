@@ -48,6 +48,24 @@ body {
   letter-spacing: 0.3px;
   margin-right: 4px;
 }
+.hve-credit {
+  color: var(--text-dim);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hve-credit:hover {
+  color: var(--accent);
+}
+.hve-saved {
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.hve-restore {
+  color: #9ff0b5;
+  border-color: var(--line);
+}
 .hve-tb-group {
   display: flex;
   align-items: center;

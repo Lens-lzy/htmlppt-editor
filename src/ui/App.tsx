@@ -55,8 +55,14 @@ export function App() {
     applyVars()
 
     const onKey = (e: KeyboardEvent) => {
-      if (editing.value) return // 文字编辑时让浏览器处理原生撤销
       const meta = e.ctrlKey || e.metaKey
+      // 保存缓存：Ctrl/Cmd+S（文字编辑时也生效，拦截浏览器默认保存）
+      if (meta && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void core.saveCache()
+        return
+      }
+      if (editing.value) return // 文字编辑时让浏览器处理原生撤销
       if (meta && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         e.shiftKey ? core.redo() : core.undo()

@@ -34,7 +34,7 @@ export async function openFolderViaPicker(): Promise<RawBundle | null> {
   if (!w.showDirectoryPicker) {
     throw new Error('当前浏览器不支持文件夹选择器，请改用「选择文件夹」按钮。')
   }
-  const dirHandle: FileSystemDirectoryHandle = await w.showDirectoryPicker()
+  const dirHandle: FileSystemDirectoryHandle = await w.showDirectoryPicker({ mode: 'readwrite' })
   const files = new Map<string, File>()
   const handles = new Map<string, FileSystemFileHandle>()
   await walkDir(dirHandle, '', files, handles)

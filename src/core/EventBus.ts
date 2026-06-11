@@ -9,6 +9,8 @@ export type BusEvent =
   | 'history-changed' // undo/redo 可用性变化（payload: {canUndo, canRedo}）
   | 'slides-changed' // 幻灯片列表/当前页变化
   | 'edit-mode-changed' // 进入/退出文字编辑（payload: boolean）
+  | 'cache-saved' // 自动/手动保存了缓存（payload: 时间戳 number）
+  | 'cache-available' // 打开文件时发现可恢复的缓存（payload: {ts} | null）
 
 type Handler = (payload?: any) => void
 

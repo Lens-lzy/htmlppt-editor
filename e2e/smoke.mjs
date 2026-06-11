@@ -29,6 +29,8 @@ console.log('[1] 应用加载')
 assert(await page.locator('.hve-toolbar').isVisible(), '工具栏渲染')
 assert(await page.locator('.hve-drophint').isVisible(), '初始显示拖拽提示')
 assert((await page.locator('.hve-drophint-actions button').count()) >= 2, '中间主窗口有打开文件/文件夹按钮')
+assert(await page.locator('.hve-credit').isVisible(), '标题栏展示作者/GitHub')
+assert(/github\.com/.test(await page.locator('.hve-credit').getAttribute('href')), 'GitHub 链接指向仓库')
 
 console.log('[2] 载入单页样例')
 await loadSample('single-page.html')
@@ -84,7 +86,7 @@ assert(
 console.log('[8] 导出 -> 校验干净 HTML')
 const [download] = await Promise.all([
   page.waitForEvent('download'),
-  page.getByRole('button', { name: /保存/ }).click(),
+  page.evaluate(() => window.__hveCore.exportDownload()),
 ])
 const path = await download.path()
 const html = readFileSync(path, 'utf8')
@@ -266,6 +268,33 @@ const c2Top = await frame.locator('.card').nth(1).evaluate((el) => el.getBoundin
 assert(Math.abs(c2Top - c1Top) > 2, `关闭吸附后不再对齐 (Δ=${(c2Top - c1Top).toFixed(1)})`)
 assert((await page.locator('.hve-guide').count()) === 0, '关闭吸附时无辅助线')
 await page.getByRole('button', { name: /吸附/ }).click() // 还原
+
+console.log('[19] 保存缓存 / Ctrl+S / 最后保存时间 / 恢复')
+await loadSample('single-page.html')
+await frame.locator('h1').first().waitFor()
+// 改 h1 字号到 70，作为可识别的改动
+await page.locator('.hve-layer-row', { hasText: '标题' }).first().click()
+await page.locator('.hve-sel-box').waitFor({ state: 'visible' })
+await page.locator('.hve-num input[type=number]').first().fill('70')
+await page.waitForTimeout(80)
+// Ctrl+S 保存缓存
+await page.keyboard.press('Control+s')
+await page.waitForTimeout(120)
+const savedText = await page.locator('.hve-saved').innerText()
+assert(/最后保存：\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(savedText), '展示最后保存时间 (' + savedText + ')')
+const cached = await page.evaluate(() => !!localStorage.getItem('hve-cache:single-page.html'))
+assert(cached, '已在缓存(localStorage)写入')
+// 重新加载原始文件：字号回到默认，并出现「恢复缓存」
+await loadSample('single-page.html')
+await frame.locator('h1').first().waitFor()
+const fsReload = await frame.locator('h1').first().evaluate((el) => getComputedStyle(el).fontSize)
+assert(fsReload !== '70px', '重载后回到原始字号 (' + fsReload + ')')
+await page.locator('.hve-restore').waitFor({ state: 'visible' })
+assert(await page.locator('.hve-restore').isVisible(), '发现缓存时显示「恢复缓存」')
+await page.locator('.hve-restore').click()
+await page.waitForTimeout(150)
+const fsRestored = await frame.locator('h1').first().evaluate((el) => getComputedStyle(el).fontSize)
+assert(fsRestored === '70px', '恢复缓存后字号回到 70px (' + fsRestored + ')')
 
 await browser.close()
 console.log('\n✅ ALL E2E CHECKS PASSED')

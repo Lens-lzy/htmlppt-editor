@@ -14,6 +14,8 @@ export const selectedEl = signal<HTMLElement | null>(null)
 export const layerVersion = signal(0)
 export const codeOpen = signal(false)
 export const snapOn = signal(true)
+export const lastSaved = signal<number | null>(null)
+export const cacheAvailable = signal<{ ts: number } | null>(null)
 
 export const slidesState = signal<{
   slides: SlideInfo[]
@@ -27,6 +29,13 @@ export function connectStore(core: EditorCore): void {
     loaded.value = true
     selectedEl.value = null
     layerVersion.value++
+    lastSaved.value = null
+  })
+  bus.on('cache-saved', (ts: number) => {
+    lastSaved.value = ts
+  })
+  bus.on('cache-available', (info: { ts: number } | null) => {
+    cacheAvailable.value = info
   })
   bus.on('selection-changed', (info: SelectionInfo | null) => {
     selection.value = info
