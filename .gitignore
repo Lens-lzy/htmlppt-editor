@@ -2,3 +2,8 @@ node_modules
 dist
 *.log
 .DS_Store
+
+# 参赛/策划文档，不公开
+参赛说明.md
+参赛*.md
+产品想法*.md
