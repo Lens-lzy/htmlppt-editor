@@ -818,6 +818,13 @@ export class EditorCore {
       if (this.nodeCount++ > MAX_LAYER_NODES) break
       const el = c as HTMLElement
       if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'BR') continue
+      // PPTX 内容单元(.el)：作为叶子图层，节点即画布上可选中的那个元素（保证图层高亮/点选
+      // 与画布选中一致），不再下钻其内部 el-tx/pp/span。
+      if (el.classList.contains('el')) {
+        const kind = unitKind(el)
+        out.push({ el, kind, label: friendlyLabel(el, kind), children: [] })
+        continue
+      }
       const kind = classifyContent(el)
       if (kind) {
         // 内容元素：作为一个图层，递归收集其内部的内容元素作为子层
@@ -916,6 +923,17 @@ function hasOwnText(el: HTMLElement): boolean {
 }
 
 /** 把元素归类为面向用户的内容类型；纯结构容器返回 null（不进图层树） */
+/** PPTX 内容单元(.el) 的图层类型 */
+function unitKind(el: HTMLElement): ContentKind {
+  const tag = el.tagName
+  if (tag === 'IMG' || tag === 'PICTURE' || tag === 'SVG' || el.classList.contains('el-pic')) return 'image'
+  if (tag === 'TABLE' || el.classList.contains('el-table')) return 'table'
+  if (el.classList.contains('el-chart') || el.classList.contains('el-line') || el.classList.contains('el-custom-svg'))
+    return 'image'
+  if ((el.textContent ?? '').trim()) return 'text'
+  return 'embed'
+}
+
 function classifyContent(el: HTMLElement): ContentKind | null {
   const tag = el.tagName
   if (tag === 'IMG' || tag === 'PICTURE' || tag === 'SVG') return 'image'

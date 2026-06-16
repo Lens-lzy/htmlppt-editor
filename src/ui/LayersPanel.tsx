@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'preact/hooks'
 import { layerVersion, selectedEl } from './state'
 import { getCore } from './core-instance'
 import type { LayerNode, ContentKind } from '../core/EditorCore'
@@ -37,9 +38,15 @@ export function LayersPanel() {
 function LayerRow({ node, depth }: { node: LayerNode; depth: number }) {
   const core = getCore()
   const active = selectedEl.value === node.el
+  const rowRef = useRef<HTMLDivElement>(null)
+  // 画布选中某元素时，把对应图层行滚进可视区（与画布选择同步）
+  useEffect(() => {
+    if (active) rowRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [active])
   return (
     <>
       <div
+        ref={rowRef}
         class={'hve-layer-row' + (active ? ' on' : '')}
         style={{ paddingLeft: 8 + depth * 12 + 'px' }}
         onClick={() => core.selectByEl(node.el, true)}

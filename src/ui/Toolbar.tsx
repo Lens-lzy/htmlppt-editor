@@ -13,7 +13,7 @@ import {
 } from './state'
 import { getCore } from './core-instance'
 import { snapConfig } from '../core/transform/snap'
-import { pickAndImportPptx, downloadPptxZip, presentPptx, pptxAnimated } from './PptxPanel'
+import { pickAndImportPptx, downloadPptxZip, presentPptx } from './PptxPanel'
 import type { SlideDetectMode } from '../core/types'
 
 // 平台相关快捷键展示：Mac 用 ⌘/⇧，其它用 Ctrl/Shift
@@ -248,13 +248,11 @@ export function Toolbar() {
       {isPptx ? (
         <>
           <button disabled={!loaded.value} onClick={() => void downloadPptxZip()} title="导出为 HTML + assets 图片文件夹的 ZIP">
-            📦 下载 ZIP
+            📦 导出 HTML包
           </button>
-          {pptxAnimated.value && (
-            <button disabled={!loaded.value} onClick={presentPptx} title="新窗口放映（含动画/转场）">
-              ▶ 放映
-            </button>
-          )}
+          <button disabled={!loaded.value} onClick={presentPptx} title="在新标签页放映当前（已修改）的 HTML，含动画/转场">
+            ▶ 放映
+          </button>
         </>
       ) : (
         <button disabled={!loaded.value} onClick={onExport} title="导出 / 另存为 HTML 文件">
