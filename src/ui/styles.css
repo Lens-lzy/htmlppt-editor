@@ -514,7 +514,10 @@ button:disabled .hve-kbd {
   position: absolute;
   border: 1.5px solid var(--accent);
   pointer-events: auto;
-  cursor: move;
+  cursor: grab;
+}
+.hve-sel-box:active {
+  cursor: grabbing;
 }
 .hve-sel-box.hve-editing {
   pointer-events: none;
