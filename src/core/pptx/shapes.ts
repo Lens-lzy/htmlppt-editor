@@ -7,7 +7,7 @@ import { emuToPx, angleToDeg, round } from './units'
 import { colorFromContainer, resolveColorEl } from './color'
 import { renderTextBody } from './text'
 import type { TextCtx } from './text'
-import type { PptxPackage, Rel } from './package'
+import type { PptxPackage, Rel, AssetRegistry } from './package'
 import type { ClrScheme } from './color'
 import type { Theme } from './theme'
 
@@ -16,6 +16,8 @@ export interface ShapeCtx extends TextCtx {
   theme: Theme
   pkg: PptxPackage
   rels: Map<string, Rel>
+  /** 资产登记器：图片拆成 assets/ 文件并返回相对引用 */
+  assets: AssetRegistry
 }
 
 /** 累积变换：slideEMU = a + localEMU * s */
@@ -353,8 +355,8 @@ async function renderPic(pic: Element, ctx: ShapeCtx, T: Transform): Promise<str
   let uri: string | null = null
   if (embed) {
     const rel = ctx.rels.get(embed)
-    if (rel && rel.mode !== 'External') uri = await ctx.pkg.dataUri(rel.target)
-    else if (rel) uri = rel.target
+    if (rel && rel.mode !== 'External') uri = await ctx.assets.ref(rel.target) // 拆成 assets/ 文件
+    else if (rel) uri = rel.target // 外链图片保留 URL
   }
   const decl: string[] = [boxStyle(box), 'object-fit:fill']
   const geom = geometryCss(spPr, box)

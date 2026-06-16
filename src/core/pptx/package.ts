@@ -93,6 +93,37 @@ export class PptxPackage {
     this.uriCache.set(p, uri)
     return uri
   }
+
+  /** 媒体文件 → 原始字节 */
+  async bytes(path: string): Promise<Uint8Array | null> {
+    const f = this.zip.file(norm(path))
+    return f ? await f.async('uint8array') : null
+  }
+}
+
+/**
+ * 资产登记器：把 pptx 内的媒体拆成 assets/ 下的独立文件并做去重，
+ * 返回相对入口 HTML 的引用路径（assets/imageN.ext）。
+ */
+export class AssetRegistry {
+  private map = new Map<string, string>() // 包内媒体路径 -> assets/imageN.ext
+  readonly files = new Map<string, Uint8Array>() // assets/imageN.ext -> 字节
+  private n = 0
+
+  constructor(private pkg: PptxPackage) {}
+
+  /** 登记一个媒体，返回相对引用路径；同一媒体复用同一文件（去重） */
+  async ref(mediaPath: string): Promise<string | null> {
+    const existing = this.map.get(mediaPath)
+    if (existing) return existing
+    const bytes = await this.pkg.bytes(mediaPath)
+    if (!bytes) return null
+    const ext = (mediaPath.slice(mediaPath.lastIndexOf('.') + 1) || 'png').toLowerCase()
+    const name = `assets/image${++this.n}.${ext}`
+    this.map.set(mediaPath, name)
+    this.files.set(name, bytes)
+    return name
+  }
 }
 
 function norm(p: string): string {

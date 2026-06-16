@@ -2,7 +2,7 @@
 // 输出多页纵向堆叠的 <section class="slide">，图片内联为 data URI，
 // 命中编辑器 SlideDetector 的 ".slide 兄弟" 识别，可直接载入精修。
 
-import { PptxPackage } from './package'
+import { PptxPackage, AssetRegistry } from './package'
 import type { Rel } from './package'
 import { child, children, attr, numAttr } from './ooxml'
 import { emuToPx, round } from './units'
@@ -20,6 +20,8 @@ export interface PptxImportResult {
   slideCount: number
   warnings: string[]
   animated: boolean
+  /** 拆出的资产：相对路径(assets/imageN.ext) -> 字节 */
+  assets: Map<string, Uint8Array>
 }
 
 const REL = {
@@ -83,12 +85,13 @@ async function renderSlide(
   pkg: PptxPackage,
   slidePath: string,
   warnings: string[],
+  assets: AssetRegistry,
 ): Promise<{ section: string; anim: SlideAnim }> {
   const doc = await pkg.xml(slidePath)
   if (!doc) return { section: '', anim: { transition: null, steps: [] } }
   const { theme, layoutPath, masterPath } = await resolveChain(pkg, slidePath)
   const rels = await pkg.rels(slidePath)
-  const ctx: ShapeCtx = { scheme: theme.scheme, theme, pkg, rels }
+  const ctx: ShapeCtx = { scheme: theme.scheme, theme, pkg, rels, assets }
 
   // 背景：slide -> layout -> master
   let bgCss = resolveBackground(bgOf(doc), ctx)
@@ -161,10 +164,11 @@ export async function importPptx(file: File | ArrayBuffer, name = 'presentation'
     if (rel) slidePaths.push(rel.target)
   }
 
+  const assets = new AssetRegistry(pkg)
   const sections: string[] = []
   const anims: SlideAnim[] = []
   for (const path of slidePaths) {
-    const r = await renderSlide(pkg, path, warnings)
+    const r = await renderSlide(pkg, path, warnings, assets)
     sections.push(r.section)
     anims.push(r.anim)
   }
@@ -187,7 +191,7 @@ export async function importPptx(file: File | ArrayBuffer, name = 'presentation'
     `<title>${escHtml(name)}</title>\n<style>${css}</style>\n</head>\n` +
     `<body>\n<div class="deck">\n${sections.join('\n')}\n</div>${animBlock}\n</body>\n</html>`
 
-  return { html, name, slideCount: slidePaths.length, warnings, animated }
+  return { html, name, slideCount: slidePaths.length, warnings, animated, assets: assets.files }
 }
 
 function escHtml(s: string): string {

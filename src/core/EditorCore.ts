@@ -155,6 +155,21 @@ export class EditorCore {
     await this.loadHtml(html, name, true)
   }
 
+  /**
+   * 载入 PPTX 转换结果（文件夹模式）：HTML 用相对引用 assets/，图片为独立文件。
+   * 走 AssetBundle —— 渲染时相对路径改写为 blob，导出时还原为相对路径。
+   */
+  async openFromPptx(html: string, assets: Map<string, Uint8Array>, name: string): Promise<void> {
+    this.resetSource()
+    const files = new Map<string, File>()
+    files.set('index.html', new File([html], 'index.html', { type: 'text/html' }))
+    for (const [path, bytes] of assets) {
+      files.set(path, new File([bytes as BlobPart], path.slice(path.lastIndexOf('/') + 1)))
+    }
+    this.bundle = new AssetBundle({ files, entryPath: 'index.html', entryName: name + '.html' })
+    await this.loadHtml(await this.bundle.loadEntryHtml(), name + '.html', true)
+  }
+
   async loadFromUrl(url: string, name: string): Promise<void> {
     this.resetSource()
     const html = await (await fetch(url)).text()
