@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'preact/hooks'
-import { loaded, editing, codeOpen } from './state'
+import { loaded, editing, codeOpen, activeTab } from './state'
 import { getCore } from './core-instance'
 import { Toolbar } from './Toolbar'
 import { LayersPanel } from './LayersPanel'
 import { StylePanel } from './StylePanel/StylePanel'
 import { SlidesStrip } from './SlidesStrip'
 import { CodePanel } from './CodePanel'
+import { PptxPanel } from './PptxPanel'
 
 const LS_LEFT = 'hve-left-w'
 const LS_RIGHT = 'hve-right-w'
@@ -21,6 +22,36 @@ function loadW(key: string, def: number): number {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
 export function App() {
+  const tab = activeTab.value
+  return (
+    <div class="hve-root">
+      <div class="hve-tabbar">
+        <button
+          class={'hve-tab' + (tab === 'editor' ? ' is-active' : '')}
+          onClick={() => (activeTab.value = 'editor')}
+        >
+          📝 HTML 编辑器
+        </button>
+        <button
+          class={'hve-tab' + (tab === 'pptx' ? ' is-active' : '')}
+          onClick={() => (activeTab.value = 'pptx')}
+        >
+          📤 PPTX 转 HTML
+        </button>
+      </div>
+      <div class="hve-tabbody">
+        <div class="hve-pane" style={{ display: tab === 'editor' ? 'flex' : 'none' }}>
+          <EditorPane />
+        </div>
+        <div class="hve-pane" style={{ display: tab === 'pptx' ? 'flex' : 'none' }}>
+          <PptxPanel />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditorPane() {
   const stageRef = useRef<HTMLDivElement>(null)
   const mainRef = useRef<HTMLDivElement>(null)
   const leftW = useRef(loadW(LS_LEFT, 220))

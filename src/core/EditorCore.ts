@@ -149,6 +149,12 @@ export class EditorCore {
     await this.loadHtml(f.html, f.name, true)
   }
 
+  /** 直接载入一段已生成好的自包含 HTML（如 PPTX 转换结果）。 */
+  async openFromHtml(html: string, name: string): Promise<void> {
+    this.resetSource()
+    await this.loadHtml(html, name, true)
+  }
+
   async loadFromUrl(url: string, name: string): Promise<void> {
     this.resetSource()
     const html = await (await fetch(url)).text()

@@ -17,6 +17,9 @@ export const snapOn = signal(true)
 export const lastSaved = signal<number | null>(null)
 export const cacheAvailable = signal<{ ts: number } | null>(null)
 
+/** 顶部 tab：HTML 编辑器 / PPTX 转 HTML */
+export const activeTab = signal<'editor' | 'pptx'>('editor')
+
 export const slidesState = signal<{
   slides: SlideInfo[]
   current: number

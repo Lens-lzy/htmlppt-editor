@@ -33,6 +33,181 @@ body {
   height: 100%;
 }
 
+/* ---------- Tabs ---------- */
+.hve-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.hve-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.hve-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.hve-tab:hover {
+  color: var(--text);
+}
+.hve-tab.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.hve-tabbody {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+.hve-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.hve-pane > .hve-app {
+  height: 100%;
+}
+
+/* ---------- PPTX 导入面板 ---------- */
+.ppx-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  gap: 16px;
+  overflow: auto;
+}
+.ppx-drop {
+  flex: 1 1 auto;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  background: var(--bg2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ppx-drop:hover {
+  border-color: var(--accent);
+  background: var(--bg3);
+}
+.ppx-drop.is-busy {
+  cursor: default;
+  border-color: var(--accent);
+}
+.ppx-drop-icon {
+  font-size: 48px;
+}
+.ppx-drop-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.ppx-drop-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.ppx-error {
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 13px;
+}
+.ppx-hint {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.ppx-result {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 12px;
+}
+.ppx-result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.ppx-result-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.ppx-badge {
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.ppx-badge-warn {
+  color: #ffcf6b;
+  border-color: #6b5a2a;
+}
+.ppx-badge-ok {
+  color: #7ee0a6;
+  border-color: #2a6b48;
+}
+.ppx-result-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ppx-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #3a3a3a;
+}
+.ppx-preview-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+.ppx-warnings {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.ppx-warnings summary {
+  cursor: pointer;
+}
+.ppx-warnings ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 /* ---------- Toolbar ---------- */
 .hve-toolbar {
   display: flex;
