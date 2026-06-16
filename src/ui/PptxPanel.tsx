@@ -1,19 +1,16 @@
-import { useRef } from 'preact/hooks'
 import { signal } from '@preact/signals'
 import JSZip from 'jszip'
-import { getCore } from './core-instance'
-import { activeTab } from './state'
+import { getCoreByKey } from './core-instance'
 import { importPptx } from '../core/pptx/import'
 
-type Status = 'idle' | 'working' | 'done' | 'error'
-
+type Status = 'idle' | 'working' | 'error'
 const status = signal<Status>('idle')
 const message = signal('')
-const result = signal<{ name: string; slideCount: number; warnings: string[]; animated: boolean } | null>(
-  null,
-)
-// 拆出的资产（相对路径 -> 字节）；导出/放映时用
-let lastAssets = new Map<string, Uint8Array>()
+
+// PPTX 编辑器的导出素材（供工具栏导出 ZIP / 放映用）
+let pptxAssets = new Map<string, Uint8Array>()
+let pptxName = 'presentation'
+export const pptxAnimated = signal(false)
 
 const MIME: Record<string, string> = {
   png: 'image/png',
@@ -25,8 +22,8 @@ const MIME: Record<string, string> = {
   bmp: 'image/bmp',
 }
 
-/** 转换并直接载入左侧编辑器（文件夹模式：图片拆成 assets/ 文件，相对引用） */
-async function convert(file: File): Promise<void> {
+/** 转换并载入 PPTX 编辑器（文件夹模式）；停留在 PPTX tab */
+export async function importPptxFile(file: File): Promise<void> {
   if (!/\.pptx$/i.test(file.name)) {
     status.value = 'error'
     message.value = '请选择 .pptx 文件（旧版 .ppt 暂不支持）。'
@@ -34,27 +31,36 @@ async function convert(file: File): Promise<void> {
   }
   status.value = 'working'
   message.value = `正在解析 ${file.name} …`
-  result.value = null
   try {
     const buf = await file.arrayBuffer()
-    const name = file.name.replace(/\.pptx$/i, '')
-    const res = await importPptx(buf, name)
-    lastAssets = res.assets
-    result.value = { name, slideCount: res.slideCount, warnings: res.warnings, animated: res.animated }
-    status.value = 'done'
-    // 直接载入编辑器（文件夹模式）并切过去
-    await getCore().openFromPptx(res.html, res.assets, name)
-    activeTab.value = 'editor'
+    pptxName = file.name.replace(/\.pptx$/i, '')
+    const res = await importPptx(buf, pptxName)
+    pptxAssets = res.assets
+    pptxAnimated.value = res.animated
+    await getCoreByKey('pptx').openFromPptx(res.html, res.assets, pptxName)
+    status.value = 'idle'
+    message.value = ''
   } catch (e) {
     status.value = 'error'
     message.value = '转换失败：' + ((e as Error).message || String(e))
   }
 }
 
-/** 当前编辑器里的 HTML（含编辑 + 放映运行时；图片为 assets/ 相对引用） */
-function currentHtml(): string {
+/** 弹出文件选择器导入（工具栏「导入 PPTX」用） */
+export function pickAndImportPptx(): void {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.pptx'
+  input.onchange = () => {
+    const f = input.files?.[0]
+    if (f) void importPptxFile(f)
+  }
+  input.click()
+}
+
+function pptxHtml(): string {
   try {
-    return getCore().getSourceHtml()
+    return getCoreByKey('pptx').getSourceHtml()
   } catch {
     return ''
   }
@@ -74,15 +80,12 @@ function extFromMime(mime: string): string {
 }
 
 /** 导出文件夹结构 ZIP：index.html + assets/ 图片 */
-async function downloadZip(): Promise<void> {
-  const r = result.value
-  if (!r) return
+export async function downloadPptxZip(): Promise<void> {
   const zip = new JSZip()
-  for (const [path, bytes] of lastAssets) zip.file(path, bytes)
-  // 用户在编辑器里新插入的内联图片也一并拆到 assets/
-  let i = lastAssets.size
+  for (const [path, bytes] of pptxAssets) zip.file(path, bytes)
+  let i = pptxAssets.size
   const seen = new Map<string, string>()
-  const html = currentHtml().replace(
+  const html = pptxHtml().replace(
     /data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=]+)/gi,
     (m, mime: string, b64: string) => {
       const cached = seen.get(m)
@@ -94,7 +97,7 @@ async function downloadZip(): Promise<void> {
     },
   )
   zip.file('index.html', html)
-  downloadBlob(await zip.generateAsync({ type: 'blob' }), r.name + '.zip')
+  downloadBlob(await zip.generateAsync({ type: 'blob' }), pptxName + '.zip')
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -106,11 +109,11 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin)
 }
 
-/** 放映预览：把 assets/ 临时内联成 base64，开新窗口运行（仅查看，非保存） */
-function present(): void {
-  let html = currentHtml()
+/** 放映预览：把 assets/ 临时内联后开新窗口运行 */
+export function presentPptx(): void {
+  let html = pptxHtml()
   if (!html) return
-  for (const [path, bytes] of lastAssets) {
+  for (const [path, bytes] of pptxAssets) {
     const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
     const uri = `data:${MIME[ext] || 'application/octet-stream'};base64,${bytesToBase64(bytes)}`
     html = html.split(path).join(uri)
@@ -120,80 +123,33 @@ function present(): void {
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
-function reset(): void {
-  status.value = 'idle'
-  message.value = ''
-  result.value = null
-  lastAssets = new Map()
-}
-
-export function PptxPanel() {
-  const inputRef = useRef<HTMLInputElement>(null)
+/** PPTX 编辑器的空态：导入落地页（载入后由 App 隐藏、显示编辑画布） */
+export function PptxDrop() {
   const st = status.value
-  const res = result.value
-
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     const f = e.dataTransfer?.files?.[0]
-    if (f) void convert(f)
+    if (f) void importPptxFile(f)
   }
-  const onPick = () => inputRef.current?.click()
-  const onInput = (e: Event) => {
-    const f = (e.target as HTMLInputElement).files?.[0]
-    if (f) void convert(f)
-  }
-
   return (
     <div class="ppx-root">
-      <input ref={inputRef} type="file" accept=".pptx" style={{ display: 'none' }} onChange={onInput} />
-
-      {(st === 'idle' || st === 'error' || st === 'working') && (
-        <div
-          class={'ppx-drop' + (st === 'working' ? ' is-busy' : '')}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          onClick={st === 'working' ? undefined : onPick}
-        >
-          <div class="ppx-drop-icon">{st === 'working' ? '⏳' : '📊'}</div>
-          <div class="ppx-drop-title">{st === 'working' ? '正在转换…' : '把 PPTX 文件拖到这里'}</div>
-          <div class="ppx-drop-sub">
-            {st === 'working' ? message.value : '或点击选择 .pptx 文件 —— 本地解析，不上传、不使用 AI'}
-          </div>
-          {st === 'error' && <div class="ppx-error">{message.value}</div>}
+      <div
+        class={'ppx-drop' + (st === 'working' ? ' is-busy' : '')}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+        onClick={st === 'working' ? undefined : pickAndImportPptx}
+      >
+        <div class="ppx-drop-icon">{st === 'working' ? '⏳' : '📊'}</div>
+        <div class="ppx-drop-title">{st === 'working' ? '正在转换…' : '把 PPTX 文件拖到这里'}</div>
+        <div class="ppx-drop-sub">
+          {st === 'working' ? message.value : '或点击选择 .pptx —— 本地解析，不上传、不使用 AI'}
         </div>
-      )}
-
-      {st === 'done' && res && (
-        <div class="ppx-done">
-          <div class="ppx-done-icon">✅</div>
-          <div class="ppx-done-title">
-            已转换 {res.slideCount} 页并载入「HTML 编辑器」
-            {res.animated && <span class="ppx-badge ppx-badge-ok">含动画</span>}
-            {res.warnings.length > 0 && (
-              <span class="ppx-badge ppx-badge-warn">{res.warnings.length} 条提示</span>
-            )}
-          </div>
-          <div class="ppx-done-sub">
-            {res.name} · 图片已拆为 {lastAssets.size} 个 assets 文件
-          </div>
-          <div class="ppx-done-actions">
-            <button class="hve-primary" onClick={() => (activeTab.value = 'editor')}>
-              ✏️ 去编辑器精修
-            </button>
-            <button onClick={() => void downloadZip()}>📦 下载 ZIP（HTML + assets 文件夹）</button>
-            {res.animated && <button onClick={present}>▶ 放映预览</button>}
-            <button onClick={reset}>↺ 转换其它文件</button>
-          </div>
-        </div>
-      )}
-
-      {(st === 'idle' || st === 'error') && (
-        <div class="ppx-hint">
-          确定性还原文字、图片、自定义形状、表格、连接线、渐变、主题配色与版式背景；动画/转场转成可放映效果。
-          转换后图片会拆成独立的 assets/ 文件并以相对路径关联，直接载入左侧「HTML 编辑器」精修；导出为「ZIP（含
-          assets 图片文件夹）」的完整网页结构。
-        </div>
-      )}
+        {st === 'error' && <div class="ppx-error">{message.value}</div>}
+      </div>
+      <div class="ppx-hint">
+        转换后图片拆成独立 assets/ 文件并以相对路径关联，直接在本编辑器里点选、拖动、改字、调样式；
+        工具栏可「下载 ZIP（含 assets 图片文件夹）」或「放映」。
+      </div>
     </div>
   )
 }

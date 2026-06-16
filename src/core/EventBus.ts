@@ -11,6 +11,7 @@ export type BusEvent =
   | 'edit-mode-changed' // 进入/退出文字编辑（payload: boolean）
   | 'cache-saved' // 自动/手动保存了缓存（payload: 时间戳 number）
   | 'cache-available' // 打开文件时发现可恢复的缓存（payload: {ts} | null）
+  | 'content-state' // 切换激活编辑器时同步「是否已载入内容」（payload: boolean）
 
 type Handler = (payload?: any) => void
 

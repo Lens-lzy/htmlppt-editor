@@ -112,6 +112,11 @@ export class SlideController {
     )
   }
 
+  /** 重新广播当前幻灯片状态（切换激活编辑器时同步 UI 用） */
+  broadcast(): void {
+    this.emit()
+  }
+
   /** 结构操作后重建并广播 */
   private sync(): void {
     this.rebuild()

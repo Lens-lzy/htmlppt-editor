@@ -9,9 +9,11 @@ import {
   snapOn,
   lastSaved,
   cacheAvailable,
+  activeTab,
 } from './state'
 import { getCore } from './core-instance'
 import { snapConfig } from '../core/transform/snap'
+import { pickAndImportPptx, downloadPptxZip, presentPptx, pptxAnimated } from './PptxPanel'
 import type { SlideDetectMode } from '../core/types'
 
 // 平台相关快捷键展示：Mac 用 ⌘/⇧，其它用 Ctrl/Shift
@@ -49,6 +51,7 @@ export function Toolbar() {
   const [res, setRes] = useState<SearchRes>({ count: 0, index: 0 })
   const openWrap = useRef<HTMLDivElement>(null)
   const mode = slidesState.value.mode
+  const isPptx = activeTab.value === 'pptx'
 
   const flash = (m: string) => {
     setMsg(m)
@@ -139,19 +142,25 @@ export function Toolbar() {
       </a>
 
       <div class="hve-tb-group">
-        <div class="hve-open" ref={openWrap}>
-          <button onClick={() => setOpenMenu((v) => !v)} title="打开 HTML 文件或整个文件夹">
-            📂 打开 ▾
+        {isPptx ? (
+          <button onClick={pickAndImportPptx} title="选择 .pptx 文件转换并载入">
+            📊 导入 PPTX
           </button>
-          {openMenu && (
-            <div class="hve-menu">
-              <button class="hve-menu-item" onClick={openHtml}>📄 打开 HTML 文件</button>
-              <button class="hve-menu-item" onClick={openFolder}>
-                📁 打开文件夹（含图片/CSS）
-              </button>
-            </div>
-          )}
-        </div>
+        ) : (
+          <div class="hve-open" ref={openWrap}>
+            <button onClick={() => setOpenMenu((v) => !v)} title="打开 HTML 文件或整个文件夹">
+              📂 打开 ▾
+            </button>
+            {openMenu && (
+              <div class="hve-menu">
+                <button class="hve-menu-item" onClick={openHtml}>📄 打开 HTML 文件</button>
+                <button class="hve-menu-item" onClick={openFolder}>
+                  📁 打开文件夹（含图片/CSS）
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div class="hve-tb-group">
@@ -227,9 +236,22 @@ export function Toolbar() {
       <button class="hve-primary" disabled={!loaded.value} onClick={onSave} title={`保存缓存 ${SAVE_KEY}`}>
         💾 保存
       </button>
-      <button disabled={!loaded.value} onClick={onExport} title="导出 / 另存为 HTML 文件">
-        ⬇️ 导出
-      </button>
+      {isPptx ? (
+        <>
+          <button disabled={!loaded.value} onClick={() => void downloadPptxZip()} title="导出为 HTML + assets 图片文件夹的 ZIP">
+            📦 下载 ZIP
+          </button>
+          {pptxAnimated.value && (
+            <button disabled={!loaded.value} onClick={presentPptx} title="新窗口放映（含动画/转场）">
+              ▶ 放映
+            </button>
+          )}
+        </>
+      ) : (
+        <button disabled={!loaded.value} onClick={onExport} title="导出 / 另存为 HTML 文件">
+          ⬇️ 导出
+        </button>
+      )}
       {msg && <span class="hve-toast">{msg}</span>}
     </header>
   )

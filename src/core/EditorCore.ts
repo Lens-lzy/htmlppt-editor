@@ -74,6 +74,7 @@ export class EditorCore {
   private zoom = 1
   private panX = 0
   private panY = 0
+  private mounted = false
   private fileName = 'edited.html'
   private handle?: FileSystemFileHandle
   private bundle: AssetBundle | null = null
@@ -145,6 +146,7 @@ export class EditorCore {
     this.autoSaveTimer = window.setInterval(() => {
       if (this.hasContent && this.dirty) void this.saveCache()
     }, AUTO_SAVE_MS)
+    this.mounted = true
   }
 
   // ---------- 文件 ----------
@@ -367,6 +369,26 @@ export class EditorCore {
   }
   get hasHandle(): boolean {
     return !!this.handle
+  }
+
+  /**
+   * 重新向 UI 广播本编辑器的当前状态（多编辑器切换激活时调用）。
+   * 让刚绑定的全局 signals 立刻反映这个编辑器，而非停留在另一个编辑器的旧状态。
+   */
+  resync(): void {
+    this.bus.emit('content-state', this.hasContent)
+    this.bus.emit('history-changed', { canUndo: this.history.canUndo, canRedo: this.history.canRedo })
+    if (!this.mounted) return // 尚未挂载（首帧）：仅同步空态，控制器还没就绪
+    this.slides.broadcast()
+    if (this.selection.selected) this.selection.refresh()
+    else this.bus.emit('selection-changed', null)
+    if (this.hasContent) this.announceCache()
+    else this.bus.emit('cache-available', null)
+  }
+
+  /** 当前是否已载入内容 */
+  get contentLoaded(): boolean {
+    return this.hasContent
   }
 
   // ---------- 画布视图：缩放 / 平移 ----------
