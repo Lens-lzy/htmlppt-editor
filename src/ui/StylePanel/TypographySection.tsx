@@ -1,15 +1,7 @@
-import { styleSnapshot } from '../state'
+import { styleSnapshot, selection } from '../state'
 import { getCore } from '../core-instance'
-import { Field, NumberInput, ColorInput, SelectInput, ButtonGroup, TextInput } from './controls'
+import { Field, NumberInput, ColorInput, ButtonGroup, TextInput } from './controls'
 
-const WEIGHTS = [
-  { value: '300', label: '细 300' },
-  { value: '400', label: '常规 400' },
-  { value: '500', label: '中 500' },
-  { value: '600', label: '半粗 600' },
-  { value: '700', label: '粗 700' },
-  { value: '800', label: '特粗 800' },
-]
 const ALIGNS = [
   { value: 'left', label: '左' },
   { value: 'center', label: '中' },
@@ -17,16 +9,21 @@ const ALIGNS = [
   { value: 'justify', label: '两端' },
 ]
 
-function normWeight(w: string): string {
-  if (w === 'normal') return '400'
-  if (w === 'bold') return '700'
-  return WEIGHTS.some((x) => x.value === w) ? w : '400'
+function isBoldWeight(w: string): boolean {
+  if (w === 'bold' || w === 'bolder') return true
+  const n = Number(w)
+  return Number.isFinite(n) && n >= 600
 }
 
 export function TypographySection() {
   const s = styleSnapshot.value
   const core = getCore()
   const px = (prop: string, v: string) => core.applyStyle(prop, v ? v + 'px' : '')
+  const bold = isBoldWeight(s.fontWeight ?? '400')
+  const italic = s.fontStyle === 'italic'
+  const underline = (selection.value?.overrides.includes('text-decoration-line') ?? false)
+    ? true
+    : /underline/.test(s.textDecorationLine ?? '')
   return (
     <div class="hve-section">
       <div class="hve-section-title">文字</div>
@@ -36,12 +33,34 @@ export function TypographySection() {
       <Field label="颜色" prop="color">
         <ColorInput hex={s.color ?? '#000000'} onChange={(v) => core.applyStyle('color', v)} />
       </Field>
-      <Field label="字重" prop="font-weight">
-        <SelectInput
-          value={normWeight(s.fontWeight ?? '400')}
-          options={WEIGHTS}
-          onChange={(v) => core.applyStyle('font-weight', v)}
-        />
+      {/* PowerPoint 式：加粗 / 斜体 / 下划线 切换，不再暴露字重数值 */}
+      <Field label="样式">
+        <div class="hve-btn-group">
+          <button
+            class={'hve-seg hve-seg-icon' + (bold ? ' on' : '')}
+            style={{ fontWeight: 700 }}
+            title="加粗"
+            onClick={() => core.applyStyle('font-weight', bold ? 'normal' : 'bold')}
+          >
+            B
+          </button>
+          <button
+            class={'hve-seg hve-seg-icon' + (italic ? ' on' : '')}
+            style={{ fontStyle: 'italic' }}
+            title="斜体"
+            onClick={() => core.applyStyle('font-style', italic ? 'normal' : 'italic')}
+          >
+            I
+          </button>
+          <button
+            class={'hve-seg hve-seg-icon' + (underline ? ' on' : '')}
+            style={{ textDecoration: 'underline' }}
+            title="下划线"
+            onClick={() => core.applyStyle('text-decoration-line', underline ? 'none' : 'underline')}
+          >
+            U
+          </button>
+        </div>
       </Field>
       <Field label="对齐" prop="text-align">
         <ButtonGroup
@@ -50,7 +69,7 @@ export function TypographySection() {
           onChange={(v) => core.applyStyle('text-align', v)}
         />
       </Field>
-      <Field label="行高" prop="line-height">
+      <Field label="行距" prop="line-height">
         <NumberInput value={s.lineHeight ?? ''} unit="px" min={0} onChange={(v) => px('line-height', v)} />
       </Field>
       <Field label="字间距" prop="letter-spacing">
@@ -59,16 +78,6 @@ export function TypographySection() {
           unit="px"
           step={0.5}
           onChange={(v) => px('letter-spacing', v)}
-        />
-      </Field>
-      <Field label="字形" prop="font-style">
-        <ButtonGroup
-          value={s.fontStyle ?? 'normal'}
-          options={[
-            { value: 'normal', label: '正常' },
-            { value: 'italic', label: '斜体' },
-          ]}
-          onChange={(v) => core.applyStyle('font-style', v)}
         />
       </Field>
       <Field label="字体" prop="font-family">

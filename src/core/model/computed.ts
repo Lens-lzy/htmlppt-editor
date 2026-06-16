@@ -71,6 +71,7 @@ export function readSnapshot(el: HTMLElement, win: Window): StyleSnapshot {
   snap.fontFamily = cs.fontFamily
   snap.fontWeight = cs.fontWeight
   snap.fontStyle = cs.fontStyle
+  snap.textDecorationLine = cs.textDecorationLine
   snap.textAlign = cs.textAlign
   snap.lineHeight = cs.lineHeight === 'normal' ? '' : stripPx(cs.lineHeight)
   snap.letterSpacing = cs.letterSpacing === 'normal' ? '0' : stripPx(cs.letterSpacing)
