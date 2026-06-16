@@ -51,6 +51,13 @@ export class TextEditController {
     if (e.key === 'Escape') {
       e.preventDefault()
       this.cancel()
+      return
+    }
+    // 回车统一插入单个换行：避免 contentEditable 默认行为把首次回车变成「两行/嵌套块」，
+    // 表现为「敲一下像敲了好几下」。insertLineBreak 始终只插一个 <br>。
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      this.host.doc.execCommand('insertLineBreak')
     }
   }
 

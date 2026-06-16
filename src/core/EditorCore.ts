@@ -9,8 +9,9 @@ import { DragController } from './transform/DragController'
 import { ResizeController } from './transform/ResizeController'
 import { TextEditController } from './text/TextEditController'
 import { SlideController } from './slides/SlideController'
-import { StylePatchCommand } from './history/commands/StylePatchCommand'
+import { StylePatchCommand, TextRunStyleCommand } from './history/commands/StylePatchCommand'
 import { CallbackCommand } from './history/commands/CallbackCommand'
+import { TEXT_PROPS, styleTargets } from './style/textTargets'
 import { resetIds, ensureId } from './model/idattr'
 import { serialize } from './io/Serializer'
 import { readFile } from './io/Loader'
@@ -455,6 +456,14 @@ export class EditorCore {
     const el = this.selection.selected
     const id = this.selection.selectedId
     if (!el || !id) return
+    // 文字属性：落到承载文字的后代 run / 段落块（容器上设无效），否则改字色/加粗/对齐都不生效
+    if (TEXT_PROPS.has(prop)) {
+      const targets = styleTargets(el, prop)
+      if (targets.every((t) => t.style.getPropertyValue(prop) === value)) return
+      this.history.exec(new TextRunStyleCommand(id, prop, value, targets, this.model))
+      this.selection.refresh()
+      return
+    }
     const oldVal = this.applier.get(el, prop)
     if (oldVal === value) return
     this.history.exec(new StylePatchCommand(el, id, prop, oldVal, value, this.applier))

@@ -1,4 +1,5 @@
 import type { StyleSnapshot } from '../types'
+import { firstTextRun } from '../style/textTargets'
 
 /** 把 '12px' -> '12'，'normal' 等保持原样由调用方处理 */
 function stripPx(v: string): string {
@@ -60,21 +61,26 @@ export function readSnapshot(el: HTMLElement, win: Window): StyleSnapshot {
   const cs = win.getComputedStyle(el)
   const snap: StyleSnapshot = {}
 
-  const color = parseColor(cs.color)
+  // 文字属性从「代表性文字 run」读：选中文本框时真实文字色/字号在后代 span 上，
+  // 读容器只会得到默认黑色。run 即容器自身时退化为读 cs。
+  const textEl = firstTextRun(el)
+  const tcs = textEl === el ? cs : win.getComputedStyle(textEl)
+
+  const color = parseColor(tcs.color)
   snap.color = color.hex
 
   const bg = parseColor(cs.backgroundColor)
   snap.backgroundColor = bg.hex
   snap.backgroundAlpha = String(bg.alpha)
 
-  snap.fontSize = stripPx(cs.fontSize)
-  snap.fontFamily = cs.fontFamily
-  snap.fontWeight = cs.fontWeight
-  snap.fontStyle = cs.fontStyle
-  snap.textDecorationLine = cs.textDecorationLine
-  snap.textAlign = cs.textAlign
-  snap.lineHeight = cs.lineHeight === 'normal' ? '' : stripPx(cs.lineHeight)
-  snap.letterSpacing = cs.letterSpacing === 'normal' ? '0' : stripPx(cs.letterSpacing)
+  snap.fontSize = stripPx(tcs.fontSize)
+  snap.fontFamily = tcs.fontFamily
+  snap.fontWeight = tcs.fontWeight
+  snap.fontStyle = tcs.fontStyle
+  snap.textDecorationLine = tcs.textDecorationLine
+  snap.textAlign = tcs.textAlign
+  snap.lineHeight = tcs.lineHeight === 'normal' ? '' : stripPx(tcs.lineHeight)
+  snap.letterSpacing = tcs.letterSpacing === 'normal' ? '0' : stripPx(tcs.letterSpacing)
 
   snap.borderRadius = stripPx(cs.borderTopLeftRadius)
   snap.borderWidth = stripPx(cs.borderTopWidth)
@@ -84,7 +90,7 @@ export function readSnapshot(el: HTMLElement, win: Window): StyleSnapshot {
   snap.opacity = cs.opacity
   snap.rotate = readRotateDeg(cs)
   snap.boxShadow = cs.boxShadow === 'none' ? '' : cs.boxShadow
-  snap.textShadow = cs.textShadow === 'none' ? '' : cs.textShadow
+  snap.textShadow = tcs.textShadow === 'none' ? '' : tcs.textShadow
 
   for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
     snap['padding' + side] = stripPx((cs as any)['padding' + side])
