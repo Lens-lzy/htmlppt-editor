@@ -129,6 +129,7 @@ export class EditorCore {
       this.selection.select(el)
       this.textEdit.begin(el)
     }
+    this.host.onKeydown = (e) => this.handleFrameKey(e)
 
     // overlay 手势
     this.overlay.onSelectionPointerDown = (e) => this.drag.begin(e)
@@ -723,6 +724,49 @@ export class EditorCore {
       `position:absolute;left:${left}px;top:${top}px;width:${W}px;height:${H}px;object-fit:contain`,
     )
     this.insertElement(root, img, '新增图片')
+  }
+
+  /** iframe 聚焦时的键盘处理：删除选中块 + 撤销/重做/保存/复位（文字编辑时交给浏览器） */
+  private handleFrameKey(e: KeyboardEvent): void {
+    if (this.textEdit.editing) return
+    const meta = e.ctrlKey || e.metaKey
+    const k = e.key.toLowerCase()
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (this.selection.all.length) {
+        e.preventDefault()
+        this.deleteSelected()
+      }
+      return
+    }
+    if (meta && k === 'z') {
+      e.preventDefault()
+      e.shiftKey ? this.redo() : this.undo()
+    } else if (meta && k === 'y') {
+      e.preventDefault()
+      this.redo()
+    } else if (meta && k === 's') {
+      e.preventDefault()
+      void this.saveCache()
+    } else if (meta && e.key === '0') {
+      e.preventDefault()
+      this.resetView()
+    }
+  }
+
+  /** 删除当前选中的元素（多选则全删；跳过锁定项），可撤销 */
+  deleteSelected(): void {
+    const els = this.selection.all.filter((el) => !el.hasAttribute('data-hve-lock'))
+    if (!els.length) return
+    const recs = els.map((el) => ({ el, parent: el.parentElement, next: el.nextSibling }))
+    this.selection.deselect()
+    this.history.exec(
+      new CallbackCommand(
+        '删除元素',
+        () => recs.forEach((r) => r.el.remove()),
+        () => recs.forEach((r) => r.parent?.insertBefore(r.el, r.next)),
+      ),
+    )
+    this.dirty = true
   }
 
   /** 把新元素插入根节点（可撤销），并选中它 */

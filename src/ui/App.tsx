@@ -77,6 +77,15 @@ export function App() {
       } else if (meta && e.key.toLowerCase() === 'y') {
         e.preventDefault()
         getCore().redo()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // 删除选中块；但焦点在工具栏输入框时不拦截（让其正常编辑文本）
+        const t = e.target as HTMLElement | null
+        const inField =
+          !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)
+        if (!inField) {
+          e.preventDefault()
+          getCore().deleteSelected()
+        }
       }
     }
     window.addEventListener('keydown', onKey)

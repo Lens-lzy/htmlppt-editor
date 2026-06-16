@@ -37,6 +37,8 @@ export class TextEditController {
     this.oldHTML = el.innerHTML
 
     el.setAttribute('contenteditable', 'true')
+    // pre-wrap：让换行符(\n)按原样渲染，从而可连续敲出多个空行；也保留用户输入的空格
+    el.style.whiteSpace = 'pre-wrap'
     this.host.setInteractive(false)
     this.overlay.setEditing(true)
     this.bus.emit('edit-mode-changed', true)
@@ -53,12 +55,26 @@ export class TextEditController {
       this.cancel()
       return
     }
-    // 回车统一插入单个换行：避免 contentEditable 默认行为把首次回车变成「两行/嵌套块」，
-    // 表现为「敲一下像敲了好几下」。insertLineBreak 始终只插一个 <br>。
+    // 回车：插入一个真实换行符（配合 pre-wrap）。比 <br>/execCommand 更可控——
+    // 连敲多次就得到多个空行，不会被 contentEditable 的默认行为搞成乱块/吃掉空行。
     if (e.key === 'Enter') {
       e.preventDefault()
-      this.host.doc.execCommand('insertLineBreak')
+      this.insertNewline()
     }
+  }
+
+  private insertNewline(): void {
+    const doc = this.host.doc
+    const sel = this.host.win.getSelection?.() || doc.getSelection?.()
+    if (!sel || !sel.rangeCount) return
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    const nl = doc.createTextNode('\n')
+    range.insertNode(nl)
+    range.setStartAfter(nl)
+    range.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(range)
   }
 
   private onBlur = (): void => {

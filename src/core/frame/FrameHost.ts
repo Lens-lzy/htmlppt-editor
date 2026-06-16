@@ -19,6 +19,8 @@ export class FrameHost {
   onHover?: (el: HTMLElement | null, x?: number, y?: number) => void
   onClick?: (el: HTMLElement, e: MouseEvent) => void
   onDblClick?: (el: HTMLElement, e: MouseEvent) => void
+  /** iframe 内键盘事件（删除/撤销等快捷键需要在 iframe 聚焦时也能触发） */
+  onKeydown?: (e: KeyboardEvent) => void
 
   constructor(
     private container: HTMLElement,
@@ -84,6 +86,9 @@ export class FrameHost {
       true,
     )
     doc.addEventListener('mouseleave', () => this.onHover?.(null), true)
+
+    // iframe 聚焦时键盘事件只在 iframe 文档触发，不会冒泡到父窗口 -> 在这里转给核心处理
+    doc.addEventListener('keydown', (e) => this.onKeydown?.(e), true)
 
     doc.addEventListener(
       'click',
