@@ -24,9 +24,10 @@ function ShadowEditor(props: { prop: 'box-shadow' | 'text-shadow'; raw: string }
   )
 }
 
-export function EffectsSection() {
+export function EffectsSection(props: { isText?: boolean }) {
   const s = styleSnapshot.value
   const core = getCore()
+  const isText = props.isText !== false
   return (
     <div class="hve-section">
       <div class="hve-section-title">效果</div>
@@ -50,9 +51,11 @@ export function EffectsSection() {
       <Field label="投影" prop="box-shadow">
         <ShadowEditor prop="box-shadow" raw={s.boxShadow ?? ''} />
       </Field>
-      <Field label="文字阴影" prop="text-shadow">
-        <ShadowEditor prop="text-shadow" raw={s.textShadow ?? ''} />
-      </Field>
+      {isText && (
+        <Field label="文字阴影" prop="text-shadow">
+          <ShadowEditor prop="text-shadow" raw={s.textShadow ?? ''} />
+        </Field>
+      )}
     </div>
   )
 }

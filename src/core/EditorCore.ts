@@ -72,6 +72,8 @@ export class EditorCore {
   private slides!: SlideController
 
   private zoom = 1
+  private panX = 0
+  private panY = 0
   private fileName = 'edited.html'
   private handle?: FileSystemFileHandle
   private bundle: AssetBundle | null = null
@@ -128,6 +130,10 @@ export class EditorCore {
     this.overlay.onSelectionDblClick = () => {
       if (this.selection.selected) this.textEdit.begin(this.selection.selected)
     }
+
+    // 画布缩放 / 平移
+    this.host.onWheelZoom = (factor, cx, cy) => this.zoomBy(factor, cx, cy)
+    this.host.onPan = (dx, dy) => this.panBy(dx, dy)
 
     // overlay 跟随滚动/尺寸变化
     this.bus.on('reposition', () => this.selection.reposition())
@@ -241,6 +247,7 @@ export class EditorCore {
     this.searchIdx = -1
     this.fileName = name || 'edited.html'
     await this.host.load(html)
+    this.resetView() // 新内容重置缩放/平移
     this.nodeCount = this.host.doc.querySelectorAll('*').length
     this.slides.detect('auto')
     this.hasContent = true
@@ -360,6 +367,40 @@ export class EditorCore {
   }
   get hasHandle(): boolean {
     return !!this.handle
+  }
+
+  // ---------- 画布视图：缩放 / 平移 ----------
+
+  private applyView(): void {
+    this.host.setView(this.zoom, this.panX, this.panY)
+    this.selection.reposition()
+  }
+
+  /** 围绕指针（iframe 内容坐标 cx/cy）缩放 */
+  zoomBy(factor: number, cx: number, cy: number): void {
+    const nz = Math.min(5, Math.max(0.2, this.zoom * factor))
+    // 保持指针下的内容点不动：panX -= cx*(nz-zoom)
+    this.panX -= cx * (nz - this.zoom)
+    this.panY -= cy * (nz - this.zoom)
+    this.zoom = nz
+    this.applyView()
+  }
+
+  panBy(dx: number, dy: number): void {
+    this.panX += dx
+    this.panY += dy
+    this.applyView()
+  }
+
+  resetView(): void {
+    this.zoom = 1
+    this.panX = 0
+    this.panY = 0
+    this.applyView()
+  }
+
+  get zoomLevel(): number {
+    return this.zoom
   }
 
   // ---------- 编辑 ----------

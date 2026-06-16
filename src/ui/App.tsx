@@ -93,6 +93,12 @@ function EditorPane() {
         void core.saveCache()
         return
       }
+      // 复位画布缩放/平移
+      if (meta && e.key === '0') {
+        e.preventDefault()
+        core.resetView()
+        return
+      }
       if (editing.value) return // 文字编辑时让浏览器处理原生撤销
       if (meta && e.key.toLowerCase() === 'z') {
         e.preventDefault()

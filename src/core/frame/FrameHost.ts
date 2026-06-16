@@ -19,6 +19,10 @@ export class FrameHost {
   onHover?: (el: HTMLElement | null) => void
   onClick?: (el: HTMLElement, e: MouseEvent) => void
   onDblClick?: (el: HTMLElement, e: MouseEvent) => void
+  /** Ctrl/Cmd+滚轮缩放：factor>1 放大；cx/cy 为 iframe 内容坐标系下的指针位置 */
+  onWheelZoom?: (factor: number, cx: number, cy: number) => void
+  /** 鼠标中键拖动平移：dx/dy 为屏幕像素位移 */
+  onPan?: (dx: number, dy: number) => void
 
   constructor(
     private container: HTMLElement,
@@ -63,6 +67,12 @@ export class FrameHost {
     this.interactive = on
   }
 
+  /** 应用缩放/平移：用 transform（translate+scale，原点左上）；overlay 坐标读 getBoundingClientRect 天然跟随 */
+  setView(zoom: number, panX: number, panY: number): void {
+    this.iframe.style.transformOrigin = '0 0'
+    this.iframe.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`
+  }
+
   private attachListeners(): void {
     const doc = this.doc
 
@@ -96,6 +106,41 @@ export class FrameHost {
       },
       true,
     )
+
+    // Ctrl/Cmd + 滚轮：缩放（围绕指针）
+    doc.addEventListener(
+      'wheel',
+      (e) => {
+        if (!(e.ctrlKey || e.metaKey)) return
+        e.preventDefault()
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
+        this.onWheelZoom?.(factor, e.clientX, e.clientY)
+      },
+      { passive: false, capture: true },
+    )
+
+    // 鼠标中键拖动：平移
+    let panning = false
+    doc.addEventListener(
+      'mousedown',
+      (e) => {
+        if (e.button === 1) {
+          e.preventDefault()
+          panning = true
+          doc.body.style.cursor = 'grabbing'
+        }
+      },
+      true,
+    )
+    doc.addEventListener('mousemove', (e) => panning && this.onPan?.(e.movementX, e.movementY), true)
+    const endPan = () => {
+      if (panning) {
+        panning = false
+        doc.body.style.cursor = ''
+      }
+    }
+    doc.addEventListener('mouseup', endPan, true)
+    doc.addEventListener('mouseleave', endPan, true)
 
     // overlay 需要跟随的所有情况：iframe 内滚动、尺寸变化、DOM 变化
     this.win.addEventListener('scroll', () => this.scheduleReposition(), true)
