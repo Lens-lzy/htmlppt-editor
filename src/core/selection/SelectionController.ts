@@ -50,29 +50,43 @@ export class SelectionController {
    * 兜底选中（阈值内），让溢出的大字也能点中。悬停不传坐标，保持轻量。
    */
   private resolveUnit(el: HTMLElement, x?: number, y?: number): HTMLElement {
-    const direct = el.closest('.el') as HTMLElement | null
-    if (direct) return direct
-    if (x == null || y == null) return el
-    // 在阈值内的候选里挑「面积最小」的：大字号文字常溢出自身小文本框，点到露在框外的
-    // 字形其实命中了背景。若只按距离选，整页大背景(距离0)会盖过近旁的小文本框；改按
-    // 面积择优，让紧贴光标的小文本框胜出（背景虽距离0但面积巨大）。
-    const slide = el.closest('.slide') || this.host.doc.body
-    const THRESH = 36 // 内容像素：超出视为有意点空
-    let best: HTMLElement | null = null
-    let bestArea = Infinity
+    // 无坐标（悬停）：就近归一到 .el
+    if (x == null || y == null) return (el.closest('.el') as HTMLElement | null) || el
+    // 关键：不要直接用事件命中的元素 —— 整页背景图/透明形状常盖在最上层，会把它下面的
+    // 文本框、图片全挡住。改为在本页所有 .el 里，挑「包含光标且面积最小」的那个（前景内容
+    // 必然比整页背景小），让前景胜出；点空白处再按距离就近兜底（覆盖大字溢出小框的情况）。
+    // 想选最底层的大图/背景，用左侧图层面板点名即可。
+    const slide =
+      (el.closest('.slide') as HTMLElement | null) ||
+      this.host.doc.querySelector<HTMLElement>('.slide')
+    if (!slide) return (el.closest('.el') as HTMLElement | null) || el
+    const THRESH = 36 // 内容像素：点空超出此距离视为有意点空
+    let inside: HTMLElement | null = null
+    let insideArea = Infinity
+    let near: HTMLElement | null = null
+    let nearArea = Infinity
+    let nearDist = Infinity
     for (const cand of Array.from(slide.querySelectorAll<HTMLElement>('.el'))) {
       const r = cand.getBoundingClientRect()
       if (r.width < 1 || r.height < 1) continue
-      const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
-      const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
-      if (Math.hypot(dx, dy) > THRESH) continue
       const area = r.width * r.height
-      if (area < bestArea) {
-        bestArea = area
-        best = cand
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        if (area < insideArea) {
+          insideArea = area
+          inside = cand
+        }
+      } else {
+        const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
+        const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
+        const d = Math.hypot(dx, dy)
+        if (d <= THRESH && (d < nearDist || (d === nearDist && area < nearArea))) {
+          nearDist = d
+          nearArea = area
+          near = cand
+        }
       }
     }
-    return best || el
+    return inside || near || (el.closest('.el') as HTMLElement | null) || el
   }
 
   /** 程序化选中（图层面板点击等） */

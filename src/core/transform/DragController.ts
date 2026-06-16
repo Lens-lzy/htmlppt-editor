@@ -59,6 +59,11 @@ export class DragController {
 
   private onMove = (e: PointerEvent): void => {
     if (!this.moving || !this.el) return
+    // 安全网：若移动时已无按键按下（pointerup 丢失），立即结束，避免「不按也能拖」
+    if (e.buttons === 0) {
+      this.onUp()
+      return
+    }
     const z = this.getZoom()
     let nx = this.startTx + (e.clientX - this.startX) / z
     let ny = this.startTy + (e.clientY - this.startY) / z

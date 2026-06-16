@@ -81,6 +81,11 @@ export class ResizeController {
 
   private onMove = (e: PointerEvent): void => {
     if (!this.active || !this.el) return
+    // 安全网：移动时已无按键按下（pointerup 丢失）则立即结束，避免「不按也能缩放」
+    if (e.buttons === 0) {
+      this.onUp()
+      return
+    }
     this.shift = e.shiftKey
     const z = this.getZoom()
     const dx = (e.clientX - this.startX) / z
