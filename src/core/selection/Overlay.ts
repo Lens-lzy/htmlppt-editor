@@ -23,6 +23,8 @@ export class Overlay {
   onHandlePointerDown?: (dir: HandleDir, e: PointerEvent) => void
   /** 双击选择框 -> 进入文字编辑 */
   onSelectionDblClick?: (e: MouseEvent) => void
+  /** 滚轮落在选择框/手柄上（pointer-events:auto）：转发给画布滚动/缩放，否则会被吞掉 */
+  onWheel?: (e: WheelEvent) => void
 
   constructor(private container: HTMLElement) {
     this.layer = el('div', 'hve-overlay')
@@ -46,6 +48,10 @@ export class Overlay {
       this.handles.set(dir, h)
       this.selBox.appendChild(h)
     }
+
+    // 选择框/手柄会捕获滚轮（pointer-events:auto），导致滚轮无法滚动下面的 iframe；
+    // 在 overlay 层接住冒泡上来的 wheel 并转发给画布。passive:false 以便可 preventDefault。
+    this.layer.addEventListener('wheel', (e) => this.onWheel?.(e as WheelEvent), { passive: false })
 
     this.layer.appendChild(this.hoverBox)
     this.layer.appendChild(this.selBox)

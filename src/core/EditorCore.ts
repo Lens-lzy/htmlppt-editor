@@ -138,6 +138,20 @@ export class EditorCore {
     // 画布缩放 / 平移
     this.host.onWheelZoom = (factor, cx, cy) => this.zoomBy(factor, cx, cy)
     this.host.onPan = (dx, dy) => this.panBy(dx, dy)
+    // 滚轮落在选择框上时转发：Ctrl/Cmd 缩放（围绕指针），否则滚动 iframe 内容
+    this.overlay.onWheel = (e) => {
+      e.preventDefault()
+      const f = this.host.iframe.getBoundingClientRect()
+      const cx = (e.clientX - f.left) / this.zoom
+      const cy = (e.clientY - f.top) / this.zoom
+      if (e.ctrlKey || e.metaKey) {
+        this.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, cx, cy)
+      } else {
+        const se = this.host.doc.scrollingElement || this.host.doc.documentElement
+        // behavior:auto 抵消 deck 的 scroll-behavior:smooth，逐格滚动跟手不拖泥
+        se.scrollBy({ left: e.deltaX, top: e.deltaY, behavior: 'auto' })
+      }
+    }
 
     // overlay 跟随滚动/尺寸变化
     this.bus.on('reposition', () => this.selection.reposition())
