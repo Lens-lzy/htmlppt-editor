@@ -24,6 +24,7 @@ export class SelectionController {
       this.overlay.showHover(null)
       return
     }
+    el = this.resolveUnit(el)
     if (el === this.selected) {
       this.overlay.showHover(null)
       return
@@ -34,7 +35,18 @@ export class SelectionController {
 
   handleClick(el: HTMLElement): void {
     if (!el || el.tagName === 'HTML') return
-    this.select(el)
+    this.select(this.resolveUnit(el))
+  }
+
+  /**
+   * 把点击/悬停目标归一到「内容单元」。PPTX 生成的内容里，每个形状/图片/表格都带
+   * `.el` 类，内部文字是 `.el-tx>.pp>span`（无 `.el`）。点到文字时应选中整个文本框
+   * （`.el-sp`），这样缩放走 width/height 让文字自动换行，而非缩放单个文字 run 的字号
+   * —— 与 PowerPoint 的文本框行为一致。HTML 编辑器加载的任意 HTML 无 `.el` 类，
+   * closest 返回 null，回退到原始目标，行为不变。
+   */
+  private resolveUnit(el: HTMLElement): HTMLElement {
+    return (el.closest('.el') as HTMLElement | null) || el
   }
 
   /** 程序化选中（图层面板点击等） */
