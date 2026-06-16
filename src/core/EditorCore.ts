@@ -122,7 +122,7 @@ export class EditorCore {
 
     // iframe 内交互 -> 控制器
     this.host.onHover = (el) => !this.textEdit.editing && this.selection.handleHover(el)
-    this.host.onClick = (el) => this.selection.handleClick(el)
+    this.host.onClick = (el, e) => this.selection.handleClick(el, e.clientX, e.clientY)
     this.host.onDblClick = (el) => {
       this.selection.select(el)
       this.textEdit.begin(el)

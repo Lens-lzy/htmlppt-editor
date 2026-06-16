@@ -33,9 +33,9 @@ export class SelectionController {
     this.overlay.showHover(this.host.viewRect(el))
   }
 
-  handleClick(el: HTMLElement): void {
+  handleClick(el: HTMLElement, x?: number, y?: number): void {
     if (!el || el.tagName === 'HTML') return
-    this.select(this.resolveUnit(el))
+    this.select(this.resolveUnit(el, x, y))
   }
 
   /**
@@ -44,9 +44,30 @@ export class SelectionController {
    * （`.el-sp`），这样缩放走 width/height 让文字自动换行，而非缩放单个文字 run 的字号
    * —— 与 PowerPoint 的文本框行为一致。HTML 编辑器加载的任意 HTML 无 `.el` 类，
    * closest 返回 null，回退到原始目标，行为不变。
+   *
+   * 点击容错：大字号文本常溢出自身文本框，点到「露在框外」的字形其实命中了背景，
+   * closest 找不到 `.el`。此时（给了点击坐标）在同页内按到光标的距离找最近的 `.el`
+   * 兜底选中（阈值内），让溢出的大字也能点中。悬停不传坐标，保持轻量。
    */
-  private resolveUnit(el: HTMLElement): HTMLElement {
-    return (el.closest('.el') as HTMLElement | null) || el
+  private resolveUnit(el: HTMLElement, x?: number, y?: number): HTMLElement {
+    const direct = el.closest('.el') as HTMLElement | null
+    if (direct) return direct
+    if (x == null || y == null) return el
+    const slide = el.closest('.slide') || this.host.doc.body
+    let best: HTMLElement | null = null
+    let bestD = 48 // 内容像素阈值：超出则认为是有意点空
+    for (const cand of Array.from(slide.querySelectorAll<HTMLElement>('.el'))) {
+      const r = cand.getBoundingClientRect()
+      if (r.width < 1 || r.height < 1) continue
+      const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
+      const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
+      const d = Math.hypot(dx, dy)
+      if (d < bestD) {
+        bestD = d
+        best = cand
+      }
+    }
+    return best || el
   }
 
   /** 程序化选中（图层面板点击等） */
