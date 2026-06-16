@@ -16,6 +16,7 @@ export class Overlay {
   private selBox: HTMLElement
   private handles = new Map<HandleDir, HTMLElement>()
   private guideEls: HTMLElement[] = []
+  private multiBoxes: HTMLElement[] = []
 
   /** 抓住选择框主体开始拖动 */
   onSelectionPointerDown?: (e: PointerEvent) => void
@@ -72,6 +73,22 @@ export class Overlay {
       return
     }
     place(this.selBox, toContainerSpace(rect, this.container))
+  }
+
+  /** 多选：画一组纯描边框（无手柄、pointer-events:none），primary 选择框另行隐藏 */
+  showMulti(rects: ViewRect[]): void {
+    this.clearMulti()
+    for (const r of rects) {
+      const b = el('div', 'hve-multi-box')
+      place(b, toContainerSpace(r, this.container))
+      this.layer.appendChild(b)
+      this.multiBoxes.push(b)
+    }
+  }
+
+  clearMulti(): void {
+    for (const b of this.multiBoxes) b.remove()
+    this.multiBoxes = []
   }
 
   /** 文字编辑期间：隐藏手柄、让选择框不拦截指针，便于直接操作 iframe 元素 */

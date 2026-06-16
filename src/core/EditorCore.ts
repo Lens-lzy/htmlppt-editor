@@ -123,7 +123,8 @@ export class EditorCore {
 
     // iframe 内交互 -> 控制器
     this.host.onHover = (el, x, y) => !this.textEdit.editing && this.selection.handleHover(el, x, y)
-    this.host.onClick = (el, e) => this.selection.handleClick(el, e.clientX, e.clientY)
+    this.host.onClick = (el, e) =>
+      this.selection.handleClick(el, e.clientX, e.clientY, e.shiftKey || e.metaKey || e.ctrlKey)
     this.host.onDblClick = (el) => {
       this.selection.select(el)
       this.textEdit.begin(el)
@@ -453,9 +454,19 @@ export class EditorCore {
   }
 
   applyStyle(prop: string, value: string): void {
-    const el = this.selection.selected
+    const els = this.selection.all
     const id = this.selection.selectedId
-    if (!el || !id) return
+    if (!els.length || !id) return
+    // 多选：把改动批量作用到所有选中元素（文字属性落到各自的 run/段落块），一步可撤销
+    if (els.length > 1) {
+      const targets = TEXT_PROPS.has(prop)
+        ? els.flatMap((e) => styleTargets(e, prop))
+        : els
+      this.history.exec(new TextRunStyleCommand(id, prop, value, targets, this.model))
+      this.selection.refresh()
+      return
+    }
+    const el = els[0]
     // 文字属性：落到承载文字的后代 run / 段落块（容器上设无效），否则改字色/加粗/对齐都不生效
     if (TEXT_PROPS.has(prop)) {
       const targets = styleTargets(el, prop)

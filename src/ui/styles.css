@@ -520,6 +520,12 @@ button:disabled .hve-kbd {
   pointer-events: none;
   border-style: dashed;
 }
+.hve-multi-box {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  background: rgba(76, 141, 255, 0.08);
+  pointer-events: none;
+}
 .hve-sel-box.hve-editing .hve-handle {
   display: none;
 }

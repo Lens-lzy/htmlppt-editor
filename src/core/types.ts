@@ -21,6 +21,8 @@ export interface SelectionInfo {
   tagName: string
   /** 我们覆盖过的 CSS 属性集合（用于「重置此项」小圆点） */
   overrides: string[]
+  /** 当前选中元素总数（多选 >1） */
+  count?: number
 }
 
 /** 命令模式：所有 DOM 改动的唯一写入单元 */

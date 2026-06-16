@@ -9,7 +9,14 @@ import { readSnapshot } from '../model/computed'
 export class SelectionController {
   selected: HTMLElement | null = null
   selectedId: string | null = null
+  /** 多选时的附加元素（primary = selected，其余在这里） */
+  private extra: HTMLElement[] = []
   private hovered: HTMLElement | null = null
+
+  /** 当前所有被选中的元素（primary 在首位） */
+  get all(): HTMLElement[] {
+    return this.selected ? [this.selected, ...this.extra] : []
+  }
 
   constructor(
     private bus: EventBus,
@@ -47,15 +54,65 @@ export class SelectionController {
     this.overlay.showHover(this.host.viewRect(el))
   }
 
-  handleClick(el: HTMLElement, x?: number, y?: number): void {
+  handleClick(el: HTMLElement, x?: number, y?: number, additive = false): void {
     if (!el || el.tagName === 'HTML') return
     // PPTX（有 .slide）：一律按坐标在幻灯片内挑元素；点到幻灯片外（黑边/页间空隙）则取消选中。
     if (x != null && y != null && this.host.doc.querySelector('.slide')) {
-      this.selectAtPoint(x, y)
+      const found = this.pickAtPoint(x, y)
+      if (additive && found) {
+        this.toggleInSelection(found)
+        return
+      }
+      if (found) this.select(found)
+      else this.deselect()
       return
     }
     // HTML 编辑器（无 .slide）：保持原行为，直接选中命中的元素
-    this.select((el.closest('.el') as HTMLElement | null) || el)
+    const unit = (el.closest('.el') as HTMLElement | null) || el
+    if (additive) this.toggleInSelection(unit)
+    else this.select(unit)
+  }
+
+  /** Shift/⌘ 点击：把元素加入/移出多选集合 */
+  toggleInSelection(el: HTMLElement): void {
+    if (!this.selected) {
+      this.select(el)
+      return
+    }
+    if (el === this.selected) {
+      // 取消 primary：把第一个附加项提为 primary，没有则整体取消
+      const next = this.extra.shift()
+      if (next) {
+        this.selected = next
+        this.selectedId = ensureId(next)
+      } else {
+        this.deselect()
+        return
+      }
+    } else {
+      const i = this.extra.indexOf(el)
+      if (i >= 0) this.extra.splice(i, 1)
+      else this.extra.push(el)
+    }
+    this.renderSelection()
+    this.emitSelection()
+    this.emitSnapshot()
+  }
+
+  /** 按当前选中数量绘制：单选画带手柄的框，多选画一组描边框 */
+  private renderSelection(): void {
+    const all = this.all
+    this.overlay.showHover(null)
+    if (all.length > 1) {
+      this.overlay.showSelection(null) // 隐藏单选框/手柄（多选不支持拖拽缩放）
+      this.overlay.showMulti(all.map((e) => this.host.viewRect(e)))
+    } else if (all.length === 1) {
+      this.overlay.clearMulti()
+      this.overlay.showSelection(this.host.viewRect(all[0]))
+    } else {
+      this.overlay.clearMulti()
+      this.overlay.showSelection(null)
+    }
   }
 
   /**
@@ -120,10 +177,12 @@ export class SelectionController {
     return (el.closest('.el') as HTMLElement | null) || el
   }
 
-  /** 程序化选中（图层面板点击等） */
+  /** 程序化选中（图层面板点击等）：单选，清空多选附加项 */
   select(el: HTMLElement): void {
     this.selected = el
     this.selectedId = ensureId(el)
+    this.extra = []
+    this.overlay.clearMulti()
     this.overlay.showHover(null)
     this.overlay.showSelection(this.host.viewRect(el))
     this.emitSelection()
@@ -133,6 +192,8 @@ export class SelectionController {
   deselect(): void {
     this.selected = null
     this.selectedId = null
+    this.extra = []
+    this.overlay.clearMulti()
     this.overlay.showSelection(null)
     this.overlay.showHover(null)
     this.bus.emit('selection-changed', null)
@@ -140,7 +201,9 @@ export class SelectionController {
 
   /** overlay 跟随 iframe 滚动/尺寸变化重绘 */
   reposition(): void {
-    if (this.selected) this.overlay.showSelection(this.host.viewRect(this.selected))
+    const all = this.all
+    if (all.length > 1) this.overlay.showMulti(all.map((e) => this.host.viewRect(e)))
+    else if (this.selected) this.overlay.showSelection(this.host.viewRect(this.selected))
     if (this.hovered) this.overlay.showHover(this.host.viewRect(this.hovered))
   }
 
@@ -158,6 +221,7 @@ export class SelectionController {
       id: this.selectedId,
       tagName: this.selected.tagName.toLowerCase(),
       overrides: this.model.overriddenProps(this.selectedId),
+      count: this.all.length,
     }
     this.bus.emit('selection-changed', info)
   }

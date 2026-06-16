@@ -25,27 +25,39 @@ export function StylePanel() {
   const kindLabel = KIND_LABEL[tag] || '元素'
   const core = getCore()
   const locked = sel ? core.isLocked() : false
+  const multi = (sel?.count ?? 1) > 1
   return (
     <aside class="hve-rightbar">
       <div class="hve-panel-head">样式</div>
       {!sel ? (
-        <div class="hve-empty-hint">在画布中点选一个元素开始编辑</div>
+        <div class="hve-empty-hint">在画布中点选一个元素开始编辑（Shift/⌘ 点击可多选）</div>
       ) : (
         <div class="hve-panel-scroll">
           <div class="hve-sel-tag">
             <span>
-              已选中 <b>{kindLabel}</b>
+              {multi ? (
+                <>
+                  已选中 <b>{sel!.count} 个元素</b>
+                </>
+              ) : (
+                <>
+                  已选中 <b>{kindLabel}</b>
+                </>
+              )}
             </span>
-            <button
-              type="button"
-              class={'hve-lock' + (locked ? ' on' : '')}
-              title={locked ? '已锁定位置/大小，点击解锁' : '锁定位置/大小'}
-              onClick={() => core.toggleLock()}
-            >
-              {locked ? '🔒 已锁定' : '🔓 锁定'}
-            </button>
+            {!multi && (
+              <button
+                type="button"
+                class={'hve-lock' + (locked ? ' on' : '')}
+                title={locked ? '已锁定位置/大小，点击解锁' : '锁定位置/大小'}
+                onClick={() => core.toggleLock()}
+              >
+                {locked ? '🔒 已锁定' : '🔓 锁定'}
+              </button>
+            )}
           </div>
-          <ReferenceSection />
+          {/* 多选时隐藏「引用文件」（按单个图片换源），其余样式批量作用于所有选中元素 */}
+          {!multi && <ReferenceSection />}
           {!isMedia && <TypographySection />}
           <FillBorderSection />
           <EffectsSection isText={!isMedia} />
