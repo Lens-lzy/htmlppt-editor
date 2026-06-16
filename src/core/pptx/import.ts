@@ -133,7 +133,9 @@ body{background:#3a3a3a;font-family:"Microsoft YaHei","微软雅黑","PingFang S
 /* 形状不裁剪文字（PowerPoint 文本框默认允许溢出）；纯色/圆角填充仍按 border-radius 裁切 */
 .el-sp{}
 .el-tx{position:absolute;inset:0;display:flex;flex-direction:column}
-.pp{margin:0;line-height:1.2;word-break:break-word}
+/* 不用 word-break:break-word：它会把「02」「2024」这种拆成竖排单字。CJK 默认即可按字换行，
+   西文/数字作为整体，框窄时溢出而非硬拆——更贴近 PowerPoint，也便于拖宽文本框让其回流 */
+.pp{margin:0;line-height:1.2}
 .pp-bu{opacity:.85}
 .el-pic{display:block}
 .el-line{position:absolute;overflow:visible}

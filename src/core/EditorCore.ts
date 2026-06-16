@@ -135,22 +135,12 @@ export class EditorCore {
       if (this.selection.selected) this.textEdit.begin(this.selection.selected)
     }
 
-    // 画布缩放 / 平移
-    this.host.onWheelZoom = (factor, cx, cy) => this.zoomBy(factor, cx, cy)
-    this.host.onPan = (dx, dy) => this.panBy(dx, dy)
-    // 滚轮落在选择框上时转发：Ctrl/Cmd 缩放（围绕指针），否则滚动 iframe 内容
+    // 滚轮落在选择框上（pointer-events:auto）会被吞掉，转发给 iframe 内容滚动
     this.overlay.onWheel = (e) => {
       e.preventDefault()
-      const f = this.host.iframe.getBoundingClientRect()
-      const cx = (e.clientX - f.left) / this.zoom
-      const cy = (e.clientY - f.top) / this.zoom
-      if (e.ctrlKey || e.metaKey) {
-        this.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, cx, cy)
-      } else {
-        const se = this.host.doc.scrollingElement || this.host.doc.documentElement
-        // behavior:auto 抵消 deck 的 scroll-behavior:smooth，逐格滚动跟手不拖泥
-        se.scrollBy({ left: e.deltaX, top: e.deltaY, behavior: 'auto' })
-      }
+      const se = this.host.doc.scrollingElement || this.host.doc.documentElement
+      // behavior:auto 抵消 deck 的 scroll-behavior:smooth，逐格滚动跟手不拖泥
+      se.scrollBy({ left: e.deltaX, top: e.deltaY, behavior: 'auto' })
     }
 
     // overlay 跟随滚动/尺寸变化
@@ -199,7 +189,7 @@ export class EditorCore {
   }
 
   /** 把画布整体缩放到适配幻灯片宽度（用已校准的 frameZoom，不影响拖拽精度） */
-  private fitToWidth(): void {
+  fitToWidth(): void {
     const slide = this.host.doc.querySelector<HTMLElement>('.slide')
     const sw = slide ? slide.getBoundingClientRect().width / (this.zoom || 1) : 0
     const avail = this.host.iframe.clientWidth - 40
@@ -424,38 +414,20 @@ export class EditorCore {
     return this.hasContent
   }
 
-  // ---------- 画布视图：缩放 / 平移 ----------
+  // ---------- 画布视图：仅自动适配宽度（无交互缩放/平移） ----------
 
   private applyView(): void {
     this.host.setView(this.zoom, this.panX, this.panY)
     this.selection.reposition()
   }
 
-  /** 围绕指针（iframe 内容坐标 cx/cy）缩放 */
-  zoomBy(factor: number, cx: number, cy: number): void {
-    const nz = Math.min(5, Math.max(0.2, this.zoom * factor))
-    // 保持指针下的内容点不动：panX -= cx*(nz-zoom)
-    this.panX -= cx * (nz - this.zoom)
-    this.panY -= cy * (nz - this.zoom)
-    this.zoom = nz
-    this.applyView()
-  }
-
-  panBy(dx: number, dy: number): void {
-    this.panX += dx
-    this.panY += dy
-    this.applyView()
-  }
-
+  /** 复位视图：回到 1:1 后按内容重新适配宽度（Cmd/Ctrl+0） */
   resetView(): void {
     this.zoom = 1
     this.panX = 0
     this.panY = 0
     this.applyView()
-  }
-
-  get zoomLevel(): number {
-    return this.zoom
+    this.fitToWidth()
   }
 
   // ---------- 编辑 ----------

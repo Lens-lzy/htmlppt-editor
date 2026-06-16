@@ -19,10 +19,6 @@ export class FrameHost {
   onHover?: (el: HTMLElement | null) => void
   onClick?: (el: HTMLElement, e: MouseEvent) => void
   onDblClick?: (el: HTMLElement, e: MouseEvent) => void
-  /** Ctrl/Cmd+滚轮缩放：factor>1 放大；cx/cy 为 iframe 内容坐标系下的指针位置 */
-  onWheelZoom?: (factor: number, cx: number, cy: number) => void
-  /** 鼠标中键拖动平移：dx/dy 为屏幕像素位移 */
-  onPan?: (dx: number, dy: number) => void
 
   constructor(
     private container: HTMLElement,
@@ -113,19 +109,7 @@ export class FrameHost {
       true,
     )
 
-    // Ctrl/Cmd + 滚轮：缩放（围绕指针）
-    doc.addEventListener(
-      'wheel',
-      (e) => {
-        if (!(e.ctrlKey || e.metaKey)) return
-        e.preventDefault()
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
-        this.onWheelZoom?.(factor, e.clientX, e.clientY)
-      },
-      { passive: false, capture: true },
-    )
-
-    // 鼠标中键拖动：抓取滚动内容（如滚动 deck 翻页），内容某轴不可滚动时才回退到 transform 平移（缩放态拖看边缘）
+    // 鼠标中键拖动：抓取滚动内容（如滚动 deck 翻页）
     let panning = false
     let snapPrev = ''
     doc.addEventListener(
@@ -148,14 +132,9 @@ export class FrameHost {
       (e) => {
         if (!panning) return
         const se = (doc.scrollingElement || doc.documentElement) as HTMLElement
-        const canY = se.scrollHeight > se.clientHeight + 1
-        const canX = se.scrollWidth > se.clientWidth + 1
         // 抓取手势：拖动方向与内容移动方向一致 -> scrollTop 反向
-        if (canY) se.scrollTop -= e.movementY
-        if (canX) se.scrollLeft -= e.movementX
-        const restX = canX ? 0 : e.movementX
-        const restY = canY ? 0 : e.movementY
-        if (restX || restY) this.onPan?.(restX, restY)
+        se.scrollTop -= e.movementY
+        se.scrollLeft -= e.movementX
       },
       true,
     )

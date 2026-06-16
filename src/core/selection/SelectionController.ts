@@ -53,17 +53,22 @@ export class SelectionController {
     const direct = el.closest('.el') as HTMLElement | null
     if (direct) return direct
     if (x == null || y == null) return el
+    // 在阈值内的候选里挑「面积最小」的：大字号文字常溢出自身小文本框，点到露在框外的
+    // 字形其实命中了背景。若只按距离选，整页大背景(距离0)会盖过近旁的小文本框；改按
+    // 面积择优，让紧贴光标的小文本框胜出（背景虽距离0但面积巨大）。
     const slide = el.closest('.slide') || this.host.doc.body
+    const THRESH = 36 // 内容像素：超出视为有意点空
     let best: HTMLElement | null = null
-    let bestD = 48 // 内容像素阈值：超出则认为是有意点空
+    let bestArea = Infinity
     for (const cand of Array.from(slide.querySelectorAll<HTMLElement>('.el'))) {
       const r = cand.getBoundingClientRect()
       if (r.width < 1 || r.height < 1) continue
       const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
       const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
-      const d = Math.hypot(dx, dy)
-      if (d < bestD) {
-        bestD = d
+      if (Math.hypot(dx, dy) > THRESH) continue
+      const area = r.width * r.height
+      if (area < bestArea) {
+        bestArea = area
         best = cand
       }
     }

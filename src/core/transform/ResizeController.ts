@@ -5,7 +5,6 @@ import type { FrameHost } from '../frame/FrameHost'
 import type { ResizeKind } from '../types'
 import type { Overlay, HandleDir } from '../selection/Overlay'
 import { MultiStylePatchCommand } from '../history/commands/StylePatchCommand'
-import { collectSnapTargets, snapEdge, snapConfig, type SnapSet, type Guide } from './snap'
 
 /** 按元素类型决定缩放改什么属性（难点 1） */
 export function classifyResize(el: HTMLElement, win: Window): ResizeKind {
@@ -44,9 +43,6 @@ export class ResizeController {
   private startTop = 0
   private shift = false
   private active = false
-  private snapSet: SnapSet = { xs: [], ys: [] }
-  private left0 = 0 // 视口内容空间(getBoundingClientRect)的初始左/上，用于吸附比对/辅助线
-  private top0 = 0
 
   constructor(
     private selection: SelectionController,
@@ -67,8 +63,6 @@ export class ResizeController {
     const rect = el.getBoundingClientRect()
     this.startW = rect.width
     this.startH = rect.height
-    this.left0 = rect.left
-    this.top0 = rect.top
     this.startFont = parseFloat(this.host.win.getComputedStyle(el).fontSize) || 16
     this.startLeft = parseFloat(el.style.left) || el.offsetLeft || 0
     this.startTop = parseFloat(el.style.top) || el.offsetTop || 0
@@ -80,7 +74,6 @@ export class ResizeController {
     this.startX = e.clientX
     this.startY = e.clientY
     this.active = true
-    this.snapSet = this.kind === 'size' ? collectSnapTargets(this.host.doc, el) : { xs: [], ys: [] }
     window.addEventListener('pointermove', this.onMove)
     window.addEventListener('pointerup', this.onUp)
     e.preventDefault()
@@ -124,37 +117,8 @@ export class ResizeController {
         if (hasN) dTop = this.startH - newH
       }
 
-      // 吸附：对正在移动的边对齐其它元素的线（坐标均在视口内容空间）
-      const guides: Guide[] = []
-      const snapping = snapConfig.enabled && !e.altKey && !this.shift
-      if (snapping && hasE) {
-        const cand = snapEdge(this.left0 + newW, this.snapSet.xs, z, snapConfig.threshold)
-        if (cand) {
-          newW = cand.pos - this.left0
-          guides.push({ orient: 'v', pos: cand.pos, from: Math.min(this.top0, cand.a), to: Math.max(this.top0 + newH, cand.b) })
-        }
-      } else if (snapping && hasW) {
-        const cand = snapEdge(this.left0 + dLeft, this.snapSet.xs, z, snapConfig.threshold)
-        if (cand) {
-          dLeft = cand.pos - this.left0
-          newW = this.startW - dLeft
-          guides.push({ orient: 'v', pos: cand.pos, from: Math.min(this.top0, cand.a), to: Math.max(this.top0 + newH, cand.b) })
-        }
-      }
-      if (snapping && hasS) {
-        const cand = snapEdge(this.top0 + newH, this.snapSet.ys, z, snapConfig.threshold)
-        if (cand) {
-          newH = cand.pos - this.top0
-          guides.push({ orient: 'h', pos: cand.pos, from: Math.min(this.left0, cand.a), to: Math.max(this.left0 + newW, cand.b) })
-        }
-      } else if (snapping && hasN) {
-        const cand = snapEdge(this.top0 + dTop, this.snapSet.ys, z, snapConfig.threshold)
-        if (cand) {
-          dTop = cand.pos - this.top0
-          newH = this.startH - dTop
-          guides.push({ orient: 'h', pos: cand.pos, from: Math.min(this.left0, cand.a), to: Math.max(this.left0 + newW, cand.b) })
-        }
-      }
+      // 缩放不做吸附：吸附会把正在移动的边「黏」在邻近元素的对齐线上，小幅反向拖动
+      // 会被阈值卡住（要大幅拉动才挣脱），手感很差。缩放保持纯粹跟手，吸附只用于拖动定位。
 
       // 触底夹紧：尺寸不小于 MIN，同时锁住对应的 left/top 不越过对边
       if (newW < MIN) { if (hasW) dLeft = this.startW - MIN; newW = MIN }
@@ -164,7 +128,6 @@ export class ResizeController {
       if (hasS || hasN) this.applier.set(this.el, this.id, 'height', `${Math.round(newH)}px`)
       if (hasW) this.applier.set(this.el, this.id, 'left', `${Math.round(this.startLeft + dLeft)}px`)
       if (hasN) this.applier.set(this.el, this.id, 'top', `${Math.round(this.startTop + dTop)}px`)
-      this.overlay.showSnapGuides(guides, this.host.iframe, z)
     }
     this.selection.reposition()
   }
