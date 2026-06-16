@@ -28,7 +28,11 @@ export class DragController {
   private startTy = 0
   private startVal = ''
   private moving = false
+  private moved = false
   private snapSet: SnapSet = { xs: [], ys: [] }
+
+  /** 在选择框上「点击而非拖动」时回调（屏幕坐标）：用于穿透选中其下方更小的元素 */
+  onClickNoMove?: (clientX: number, clientY: number) => void
 
   constructor(
     private selection: SelectionController,
@@ -51,6 +55,7 @@ export class DragController {
     this.startX = e.clientX
     this.startY = e.clientY
     this.moving = true
+    this.moved = false
     this.snapSet = collectSnapTargets(this.host.doc, el)
     window.addEventListener('pointermove', this.onMove)
     window.addEventListener('pointerup', this.onUp)
@@ -63,6 +68,10 @@ export class DragController {
     if (e.buttons === 0) {
       this.onUp()
       return
+    }
+    // 超过阈值才算真正拖动（否则视作点击 -> 穿透选中下方元素）
+    if (!this.moved && Math.abs(e.clientX - this.startX) + Math.abs(e.clientY - this.startY) > 3) {
+      this.moved = true
     }
     const z = this.getZoom()
     let nx = this.startTx + (e.clientX - this.startX) / z
@@ -101,6 +110,8 @@ export class DragController {
         ),
       )
     }
+    // 没拖动 = 在选择框上点了一下：穿透到光标下方更小的元素重新选中（否则大框盖住无法改选）
+    if (!this.moved) this.onClickNoMove?.(this.startX, this.startY)
     this.selection.refresh()
   }
 }

@@ -130,6 +130,11 @@ export class EditorCore {
 
     // overlay 手势
     this.overlay.onSelectionPointerDown = (e) => this.drag.begin(e)
+    // 选择框上「点击未拖动」：把屏幕坐标换算到 iframe 内容坐标，穿透选中下方更小的元素
+    this.drag.onClickNoMove = (clientX, clientY) => {
+      const f = this.host.iframe.getBoundingClientRect()
+      this.selection.selectAtPoint((clientX - f.left) / this.zoom, (clientY - f.top) / this.zoom)
+    }
     this.overlay.onHandlePointerDown = (dir, e) => this.resize.begin(dir, e)
     this.overlay.onSelectionDblClick = () => {
       if (this.selection.selected) this.textEdit.begin(this.selection.selected)

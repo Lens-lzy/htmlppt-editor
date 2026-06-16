@@ -35,32 +35,44 @@ export class SelectionController {
 
   handleClick(el: HTMLElement, x?: number, y?: number): void {
     if (!el || el.tagName === 'HTML') return
-    this.select(this.resolveUnit(el, x, y))
+    // PPTX（有 .slide）：一律按坐标在幻灯片内挑元素；点到幻灯片外（黑边/页间空隙）则取消选中。
+    if (x != null && y != null && this.host.doc.querySelector('.slide')) {
+      this.selectAtPoint(x, y)
+      return
+    }
+    // HTML 编辑器（无 .slide）：保持原行为，直接选中命中的元素
+    this.select((el.closest('.el') as HTMLElement | null) || el)
   }
 
   /**
-   * 把点击/悬停目标归一到「内容单元」。PPTX 生成的内容里，每个形状/图片/表格都带
-   * `.el` 类，内部文字是 `.el-tx>.pp>span`（无 `.el`）。点到文字时应选中整个文本框
-   * （`.el-sp`），这样缩放走 width/height 让文字自动换行，而非缩放单个文字 run 的字号
-   * —— 与 PowerPoint 的文本框行为一致。HTML 编辑器加载的任意 HTML 无 `.el` 类，
-   * closest 返回 null，回退到原始目标，行为不变。
-   *
-   * 点击容错：大字号文本常溢出自身文本框，点到「露在框外」的字形其实命中了背景，
-   * closest 找不到 `.el`。此时（给了点击坐标）在同页内按到光标的距离找最近的 `.el`
-   * 兜底选中（阈值内），让溢出的大字也能点中。悬停不传坐标，保持轻量。
+   * 按坐标选中（坐标为 iframe 内容/视口坐标系，与 getBoundingClientRect 同系）。
+   * 供画布点击与「选择框上点击穿透」共用：点在某页内 -> 选该页内命中且面积最小的元素；
+   * 点在所有幻灯片之外（黑边/页间空隙）-> 取消选中。找不到则取消。
    */
-  private resolveUnit(el: HTMLElement, x?: number, y?: number): HTMLElement {
-    // 无坐标（悬停）：就近归一到 .el
-    if (x == null || y == null) return (el.closest('.el') as HTMLElement | null) || el
-    // 关键：不要直接用事件命中的元素 —— 整页背景图/透明形状常盖在最上层，会把它下面的
-    // 文本框、图片全挡住。改为在本页所有 .el 里，挑「包含光标且面积最小」的那个（前景内容
-    // 必然比整页背景小），让前景胜出；点空白处再按距离就近兜底（覆盖大字溢出小框的情况）。
-    // 想选最底层的大图/背景，用左侧图层面板点名即可。
-    const slide =
-      (el.closest('.slide') as HTMLElement | null) ||
-      this.host.doc.querySelector<HTMLElement>('.slide')
-    if (!slide) return (el.closest('.el') as HTMLElement | null) || el
-    const THRESH = 36 // 内容像素：点空超出此距离视为有意点空
+  selectAtPoint(x: number, y: number): void {
+    const found = this.pickAtPoint(x, y)
+    if (found) this.select(found)
+    else this.deselect()
+  }
+
+  /**
+   * 选取命中点的内容单元。关键：不要用事件命中的最上层元素 —— 整页背景图/透明形状常盖在
+   * 最上层，会把下面的文本框、图片全挡住。改为在「光标所在那一页」的所有 .el 里挑「包含光标
+   * 且面积最小」的（前景内容必然比整页背景小），让前景胜出；点页内空白再按距离就近兜底
+   * （覆盖大字溢出小框）。想选最底层大图/背景，用左侧图层面板点名。
+   */
+  private pickAtPoint(x: number, y: number): HTMLElement | null {
+    // 先定位光标落在哪一页；不在任何页内（黑边/页间空隙）直接判为点空
+    let slide: HTMLElement | null = null
+    for (const s of Array.from(this.host.doc.querySelectorAll<HTMLElement>('.slide'))) {
+      const r = s.getBoundingClientRect()
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        slide = s
+        break
+      }
+    }
+    if (!slide) return null
+    const THRESH = 36 // 内容像素：点页内空白且超出此距离视为点空
     let inside: HTMLElement | null = null
     let insideArea = Infinity
     let near: HTMLElement | null = null
@@ -86,7 +98,12 @@ export class SelectionController {
         }
       }
     }
-    return inside || near || (el.closest('.el') as HTMLElement | null) || el
+    return inside || near
+  }
+
+  /** 把悬停目标归一到内容单元（仅就近 closest，无坐标） */
+  private resolveUnit(el: HTMLElement): HTMLElement {
+    return (el.closest('.el') as HTMLElement | null) || el
   }
 
   /** 程序化选中（图层面板点击等） */
