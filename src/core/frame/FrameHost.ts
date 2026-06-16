@@ -125,8 +125,9 @@ export class FrameHost {
       { passive: false, capture: true },
     )
 
-    // 鼠标中键拖动：平移
+    // 鼠标中键拖动：抓取滚动内容（如滚动 deck 翻页），内容某轴不可滚动时才回退到 transform 平移（缩放态拖看边缘）
     let panning = false
+    let snapPrev = ''
     doc.addEventListener(
       'mousedown',
       (e) => {
@@ -134,15 +135,36 @@ export class FrameHost {
           e.preventDefault()
           panning = true
           doc.body.style.cursor = 'grabbing'
+          // 关掉强制吸附，否则拖动滚动会被中途吸附点不停拉回，体验割裂；松手再恢复
+          const root = doc.documentElement
+          snapPrev = root.style.scrollSnapType
+          root.style.scrollSnapType = 'none'
         }
       },
       true,
     )
-    doc.addEventListener('mousemove', (e) => panning && this.onPan?.(e.movementX, e.movementY), true)
+    doc.addEventListener(
+      'mousemove',
+      (e) => {
+        if (!panning) return
+        const se = (doc.scrollingElement || doc.documentElement) as HTMLElement
+        const canY = se.scrollHeight > se.clientHeight + 1
+        const canX = se.scrollWidth > se.clientWidth + 1
+        // 抓取手势：拖动方向与内容移动方向一致 -> scrollTop 反向
+        if (canY) se.scrollTop -= e.movementY
+        if (canX) se.scrollLeft -= e.movementX
+        const restX = canX ? 0 : e.movementX
+        const restY = canY ? 0 : e.movementY
+        if (restX || restY) this.onPan?.(restX, restY)
+      },
+      true,
+    )
     const endPan = () => {
       if (panning) {
         panning = false
         doc.body.style.cursor = ''
+        // 恢复吸附：强制吸附会自动把最近的幻灯片吸到位
+        doc.documentElement.style.scrollSnapType = snapPrev || ''
       }
     }
     doc.addEventListener('mouseup', endPan, true)
