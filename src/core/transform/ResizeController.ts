@@ -55,7 +55,7 @@ export class ResizeController {
 
   begin(dir: HandleDir, e: PointerEvent): void {
     const el = this.selection.selected
-    if (!el) return
+    if (!el || el.hasAttribute('data-hve-lock')) return // 锁定的元素不可缩放
     this.el = el
     this.id = this.selection.selectedId!
     this.dir = dir

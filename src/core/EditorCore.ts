@@ -457,6 +457,21 @@ export class EditorCore {
     this.applyStyle(prop, '')
   }
 
+  /** 选中元素是否锁定（锁定后不可拖动/缩放，仍可选中以解锁） */
+  isLocked(): boolean {
+    return !!this.selection.selected?.hasAttribute('data-hve-lock')
+  }
+
+  /** 切换锁定。data-hve-lock 为编辑器元数据，导出时由 Serializer 剥离 */
+  toggleLock(): void {
+    const el = this.selection.selected
+    if (!el) return
+    if (el.hasAttribute('data-hve-lock')) el.removeAttribute('data-hve-lock')
+    else el.setAttribute('data-hve-lock', '1')
+    this.dirty = true
+    this.selection.refresh()
+  }
+
   selectByEl(el: HTMLElement, reveal = false): void {
     this.selection.select(el)
     if (reveal) this.revealEl(el)

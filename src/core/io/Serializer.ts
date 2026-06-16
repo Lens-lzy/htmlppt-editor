@@ -19,6 +19,8 @@ export function serialize(doc: Document, opts: ExportOptions = {}): string {
   // 编辑器模式标记（在 <html> 根上，querySelectorAll 不含根，需显式剥离）：导出后恢复为独立 deck
   root.removeAttribute('data-hve-edit')
   root.querySelectorAll('[data-hve-edit]').forEach((e) => e.removeAttribute('data-hve-edit'))
+  // 锁定标记（编辑器元数据）
+  root.querySelectorAll('[data-hve-lock]').forEach((e) => e.removeAttribute('data-hve-lock'))
   // 以防万一：清掉所有以 hve- 开头的临时类
   root.querySelectorAll('[class]').forEach((e) => {
     const kept = e.className

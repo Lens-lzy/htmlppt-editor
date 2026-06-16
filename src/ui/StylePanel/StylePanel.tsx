@@ -1,4 +1,5 @@
 import { selection } from '../state'
+import { getCore } from '../core-instance'
 import { ReferenceSection } from './ReferenceSection'
 import { TypographySection } from './TypographySection'
 import { FillBorderSection } from './FillBorderSection'
@@ -22,6 +23,8 @@ export function StylePanel() {
   const tag = (sel?.tagName || '').toLowerCase()
   const isMedia = MEDIA.has(tag)
   const kindLabel = KIND_LABEL[tag] || '元素'
+  const core = getCore()
+  const locked = sel ? core.isLocked() : false
   return (
     <aside class="hve-rightbar">
       <div class="hve-panel-head">样式</div>
@@ -30,7 +33,17 @@ export function StylePanel() {
       ) : (
         <div class="hve-panel-scroll">
           <div class="hve-sel-tag">
-            已选中 <b>{kindLabel}</b>
+            <span>
+              已选中 <b>{kindLabel}</b>
+            </span>
+            <button
+              type="button"
+              class={'hve-lock' + (locked ? ' on' : '')}
+              title={locked ? '已锁定位置/大小，点击解锁' : '锁定位置/大小'}
+              onClick={() => core.toggleLock()}
+            >
+              {locked ? '🔒 已锁定' : '🔓 锁定'}
+            </button>
           </div>
           <ReferenceSection />
           {!isMedia && <TypographySection />}

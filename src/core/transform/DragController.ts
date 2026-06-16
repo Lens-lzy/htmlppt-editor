@@ -41,7 +41,7 @@ export class DragController {
 
   begin(e: PointerEvent): void {
     const el = this.selection.selected
-    if (!el) return
+    if (!el || el.hasAttribute('data-hve-lock')) return // 锁定的元素不可拖动
     this.el = el
     this.id = this.selection.selectedId!
     this.startVal = el.style.translate

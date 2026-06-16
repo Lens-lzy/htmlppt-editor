@@ -679,6 +679,24 @@ button:disabled .hve-kbd {
   padding: 8px 12px;
   color: var(--text-dim);
   border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hve-lock {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text-dim);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hve-lock.on {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .hve-section {
   padding: 8px 12px 12px;
@@ -761,6 +779,19 @@ button:disabled .hve-kbd {
   border-radius: 5px;
   color: var(--text);
   padding: 4px 6px;
+}
+.hve-eyedrop {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.hve-eyedrop:hover {
+  border-color: var(--accent);
 }
 .hve-slider {
   display: flex;

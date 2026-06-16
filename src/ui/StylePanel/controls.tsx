@@ -48,6 +48,16 @@ export function NumberInput(props: {
 }
 
 export function ColorInput(props: { hex: string; onChange: (hex: string) => void }) {
+  // 原生 type=color 弹出含 RGB/调色板；吸管用 EyeDropper API（Chromium 支持）从屏幕取色
+  const hasEyeDropper = typeof (window as any).EyeDropper === 'function'
+  const pick = async () => {
+    try {
+      const res = await new (window as any).EyeDropper().open()
+      if (res?.sRGBHex) props.onChange(res.sRGBHex)
+    } catch {
+      /* 用户取消，忽略 */
+    }
+  }
   return (
     <div class="hve-color">
       <input
@@ -61,6 +71,11 @@ export function ColorInput(props: { hex: string; onChange: (hex: string) => void
         value={props.hex}
         onInput={(e) => props.onChange((e.target as HTMLInputElement).value)}
       />
+      {hasEyeDropper && (
+        <button type="button" class="hve-eyedrop" title="吸管取色" onClick={pick}>
+          🖉
+        </button>
+      )}
     </div>
   )
 }
