@@ -148,8 +148,11 @@ export class EditorCore {
       se.scrollBy({ left: e.deltaX, top: e.deltaY, behavior: 'auto' })
     }
 
-    // overlay 跟随滚动/尺寸变化
-    this.bus.on('reposition', () => this.selection.reposition())
+    // overlay 跟随滚动/尺寸变化；同时把底部页码栏同步到当前滚到的那一页
+    this.bus.on('reposition', () => {
+      this.selection.reposition()
+      this.slides.syncCurrentToScroll()
+    })
 
     // 编辑即标脏；每 5 分钟自动保存缓存
     this.bus.on('history-changed', () => {

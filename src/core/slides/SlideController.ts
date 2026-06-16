@@ -117,6 +117,26 @@ export class SlideController {
     this.emit()
   }
 
+  /** 随滚动同步「当前页」：取在视口内可见高度最大的那一页；仅在变化时广播，不触发滚动 */
+  syncCurrentToScroll(): void {
+    if (this.roots.length < 2) return
+    const vh = this.host.win.innerHeight || 1
+    let best = this.current
+    let bestVis = -Infinity
+    this.roots.forEach((r, i) => {
+      const rect = r.getBoundingClientRect()
+      const vis = Math.min(rect.bottom, vh) - Math.max(rect.top, 0)
+      if (vis > bestVis) {
+        bestVis = vis
+        best = i
+      }
+    })
+    if (best !== this.current) {
+      this.current = best
+      this.emit()
+    }
+  }
+
   /** 结构操作后重建并广播 */
   private sync(): void {
     this.rebuild()
