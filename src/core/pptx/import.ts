@@ -13,6 +13,7 @@ import { renderShapeContainer, fillToCss, IDENTITY } from './shapes'
 import type { ShapeCtx } from './shapes'
 import { parseSlideAnim, hasAnimations, ANIM_CSS, ANIM_RUNTIME } from './anim'
 import type { SlideAnim } from './anim'
+import { DECK_CSS, DECK_RUNTIME } from './deck'
 
 export interface PptxImportResult {
   html: string
@@ -174,9 +175,9 @@ export async function importPptx(file: File | ArrayBuffer, name = 'presentation'
   }
 
   const animated = hasAnimations(anims)
-  const css = `:root{--sw:${slideW}px;--sh:${slideH}px}\n${BASE_CSS}${animated ? ANIM_CSS : ''}`
+  const css = `:root{--sw:${slideW}px;--sh:${slideH}px}\n${BASE_CSS}${DECK_CSS}${animated ? ANIM_CSS : ''}`
 
-  // 动画清单 + 放映运行时（仅在有动画/转场时注入；编辑器禁脚本不受影响）
+  // 动画清单（仅有动画时）
   let animBlock = ''
   if (animated) {
     const manifest = JSON.stringify({ slides: anims }).replace(/</g, '\\u003c')
@@ -184,12 +185,14 @@ export async function importPptx(file: File | ArrayBuffer, name = 'presentation'
       `\n<script id="pptx-anim" type="application/json">${manifest}</script>\n` +
       `<script>${ANIM_RUNTIME}</script>`
   }
+  // 滚动 deck 运行时（始终注入：一屏一页 + 右侧圆点 + 滚动吸附）
+  const deckBlock = `\n<script>${DECK_RUNTIME}</script>`
 
   const html =
     `<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n` +
     `<meta name="viewport" content="width=device-width,initial-scale=1">\n` +
     `<title>${escHtml(name)}</title>\n<style>${css}</style>\n</head>\n` +
-    `<body>\n<div class="deck">\n${sections.join('\n')}\n</div>${animBlock}\n</body>\n</html>`
+    `<body>\n<div class="deck">\n${sections.join('\n')}\n</div>${animBlock}${deckBlock}\n</body>\n</html>`
 
   return { html, name, slideCount: slidePaths.length, warnings, animated, assets: assets.files }
 }

@@ -86,9 +86,12 @@ export class EditorCore {
   private lastSavedTs: number | null = null
   private autoSaveTimer?: number
 
+  /** allowScripts：是否允许目标 iframe 运行脚本（PPTX 编辑器为 true，运行滚动 deck/动画） */
+  constructor(private allowScripts = false) {}
+
   mount(container: HTMLElement): void {
     const getZoom = () => this.zoom
-    this.host = new FrameHost(container, this.bus, getZoom)
+    this.host = new FrameHost(container, this.bus, getZoom, this.allowScripts)
     this.overlay = new Overlay(container)
     this.selection = new SelectionController(this.bus, this.host, this.overlay, this.model)
     this.drag = new DragController(
@@ -169,13 +172,29 @@ export class EditorCore {
    */
   async openFromPptx(html: string, assets: Map<string, Uint8Array>, name: string): Promise<void> {
     this.resetSource()
+    // 标记「编辑器模式」：deck 运行时据此跳过 per-slide 缩放（导出时此属性被序列化剥离）
+    const editHtml = html.replace(/<html(\s|>)/i, '<html data-hve-edit="1"$1')
     const files = new Map<string, File>()
-    files.set('index.html', new File([html], 'index.html', { type: 'text/html' }))
+    files.set('index.html', new File([editHtml], 'index.html', { type: 'text/html' }))
     for (const [path, bytes] of assets) {
       files.set(path, new File([bytes as BlobPart], path.slice(path.lastIndexOf('/') + 1)))
     }
     this.bundle = new AssetBundle({ files, entryPath: 'index.html', entryName: name + '.html' })
     await this.loadHtml(await this.bundle.loadEntryHtml(), name + '.html', true)
+    this.fitToWidth()
+  }
+
+  /** 把画布整体缩放到适配幻灯片宽度（用已校准的 frameZoom，不影响拖拽精度） */
+  private fitToWidth(): void {
+    const slide = this.host.doc.querySelector<HTMLElement>('.slide')
+    const sw = slide ? slide.getBoundingClientRect().width / (this.zoom || 1) : 0
+    const avail = this.host.iframe.clientWidth - 40
+    if (sw > 0 && avail > 0) {
+      this.zoom = Math.min(1, Math.max(0.1, avail / sw))
+      this.panX = 0
+      this.panY = 0
+      this.applyView()
+    }
   }
 
   async loadFromUrl(url: string, name: string): Promise<void> {

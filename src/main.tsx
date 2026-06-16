@@ -6,8 +6,8 @@ import { App } from './ui/App'
 import './ui/styles.css'
 
 // 两个完全独立的编辑器实例：各自文档/图层/撤销栈/缩放，互不影响
-const coreEditor = new EditorCore()
-const corePptx = new EditorCore()
+const coreEditor = new EditorCore() // HTML 编辑器：禁脚本
+const corePptx = new EditorCore(true) // PPTX 编辑器：允许脚本（滚动 deck + 动画运行时）
 setCore('editor', coreEditor)
 setCore('pptx', corePptx)
 

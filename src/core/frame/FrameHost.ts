@@ -28,10 +28,13 @@ export class FrameHost {
     private container: HTMLElement,
     private bus: EventBus,
     private getZoom: () => number,
+    allowScripts = false,
   ) {
     this.iframe = document.createElement('iframe')
     this.iframe.className = 'hve-iframe'
-    this.iframe.setAttribute('sandbox', 'allow-same-origin')
+    // PPTX 编辑器只加载本工具生成的可信 HTML，允许脚本以运行滚动 deck/动画运行时；
+    // HTML 编辑器加载任意 HTML，保持禁脚本。
+    this.iframe.setAttribute('sandbox', allowScripts ? 'allow-same-origin allow-scripts' : 'allow-same-origin')
     // 未加载内容前隐藏 iframe，避免空白白底突兀（画布暗色 + 提示更协调）
     this.iframe.style.cssText =
       'width:100%;height:100%;border:none;background:#fff;display:block;visibility:hidden;'
@@ -90,9 +93,12 @@ export class FrameHost {
       'click',
       (e) => {
         if (!this.interactive) return
+        // 放行 deck 自身的控件（右侧圆点 / 放映按钮等），让它们的点击处理器正常运行
+        const t = e.target as HTMLElement
+        if (t.closest?.('.pptx-dots, .pptx-play-btn, .pptx-present-overlay, .pptx-present-hint')) return
         e.preventDefault()
         e.stopPropagation()
-        this.onClick?.(e.target as HTMLElement, e)
+        this.onClick?.(t, e)
       },
       true,
     )

@@ -16,6 +16,9 @@ export function serialize(doc: Document, opts: ExportOptions = {}): string {
   // 文字编辑残留 / 编辑器注入的运行时
   root.querySelectorAll('[contenteditable]').forEach((e) => e.removeAttribute('contenteditable'))
   root.querySelectorAll('#hve-runtime, [data-hve]').forEach((e) => e.remove())
+  // 编辑器模式标记（在 <html> 根上，querySelectorAll 不含根，需显式剥离）：导出后恢复为独立 deck
+  root.removeAttribute('data-hve-edit')
+  root.querySelectorAll('[data-hve-edit]').forEach((e) => e.removeAttribute('data-hve-edit'))
   // 以防万一：清掉所有以 hve- 开头的临时类
   root.querySelectorAll('[class]').forEach((e) => {
     const kept = e.className
