@@ -38,10 +38,14 @@ export class ResizeController {
   private oldW = ''
   private oldH = ''
   private oldFont = ''
+  private oldLeft = ''
+  private oldTop = ''
+  private startLeft = 0 // 定位空间(style.left, 相对 offsetParent)的初始左/上
+  private startTop = 0
   private shift = false
   private active = false
   private snapSet: SnapSet = { xs: [], ys: [] }
-  private left0 = 0
+  private left0 = 0 // 视口内容空间(getBoundingClientRect)的初始左/上，用于吸附比对/辅助线
   private top0 = 0
 
   constructor(
@@ -66,8 +70,12 @@ export class ResizeController {
     this.left0 = rect.left
     this.top0 = rect.top
     this.startFont = parseFloat(this.host.win.getComputedStyle(el).fontSize) || 16
+    this.startLeft = parseFloat(el.style.left) || el.offsetLeft || 0
+    this.startTop = parseFloat(el.style.top) || el.offsetTop || 0
     this.oldW = el.style.width
     this.oldH = el.style.height
+    this.oldLeft = el.style.left
+    this.oldTop = el.style.top
     this.oldFont = el.style.fontSize
     this.startX = e.clientX
     this.startY = e.clientY
@@ -98,39 +106,64 @@ export class ResizeController {
       const font = clamp(this.startFont * scale, 4, 400)
       this.applier.set(this.el, this.id, 'font-size', `${round1(font)}px`)
     } else {
-      const aspect = this.startW / this.startH || 1
+      const hasE = this.dir.includes('e')
+      const hasW = this.dir.includes('w')
+      const hasS = this.dir.includes('s')
+      const hasN = this.dir.includes('n')
+
+      // 抓哪条边动哪条：东/南改尺寸（左上锚定）；西/北同时改尺寸与 left/top（右下锚定）
+      newW = this.startW + (hasE ? dx : hasW ? -dx : 0)
+      newH = this.startH + (hasS ? dy : hasN ? -dy : 0)
+      let dLeft = hasW ? dx : 0 // left 的位移（内容 px）
+      let dTop = hasN ? dy : 0
+
+      // Shift 锁比例（角手柄）：以宽定高，北向时同步顶边
       if (this.shift && signX !== 0 && signY !== 0) {
+        const aspect = this.startW / this.startH || 1
         newH = newW / aspect
+        if (hasN) dTop = this.startH - newH
       }
-      // 吸附：把正在移动的右/下边对齐到其它元素的线（顶左锚定，故右=left0+W、下=top0+H）
+
+      // 吸附：对正在移动的边对齐其它元素的线（坐标均在视口内容空间）
       const guides: Guide[] = []
       const snapping = snapConfig.enabled && !e.altKey && !this.shift
-      if (snapping && signX !== 0) {
+      if (snapping && hasE) {
         const cand = snapEdge(this.left0 + newW, this.snapSet.xs, z, snapConfig.threshold)
         if (cand) {
           newW = cand.pos - this.left0
-          guides.push({
-            orient: 'v',
-            pos: cand.pos,
-            from: Math.min(this.top0, cand.a),
-            to: Math.max(this.top0 + newH, cand.b),
-          })
+          guides.push({ orient: 'v', pos: cand.pos, from: Math.min(this.top0, cand.a), to: Math.max(this.top0 + newH, cand.b) })
+        }
+      } else if (snapping && hasW) {
+        const cand = snapEdge(this.left0 + dLeft, this.snapSet.xs, z, snapConfig.threshold)
+        if (cand) {
+          dLeft = cand.pos - this.left0
+          newW = this.startW - dLeft
+          guides.push({ orient: 'v', pos: cand.pos, from: Math.min(this.top0, cand.a), to: Math.max(this.top0 + newH, cand.b) })
         }
       }
-      if (snapping && signY !== 0) {
+      if (snapping && hasS) {
         const cand = snapEdge(this.top0 + newH, this.snapSet.ys, z, snapConfig.threshold)
         if (cand) {
           newH = cand.pos - this.top0
-          guides.push({
-            orient: 'h',
-            pos: cand.pos,
-            from: Math.min(this.left0, cand.a),
-            to: Math.max(this.left0 + newW, cand.b),
-          })
+          guides.push({ orient: 'h', pos: cand.pos, from: Math.min(this.left0, cand.a), to: Math.max(this.left0 + newW, cand.b) })
+        }
+      } else if (snapping && hasN) {
+        const cand = snapEdge(this.top0 + dTop, this.snapSet.ys, z, snapConfig.threshold)
+        if (cand) {
+          dTop = cand.pos - this.top0
+          newH = this.startH - dTop
+          guides.push({ orient: 'h', pos: cand.pos, from: Math.min(this.left0, cand.a), to: Math.max(this.left0 + newW, cand.b) })
         }
       }
-      if (signX !== 0) this.applier.set(this.el, this.id, 'width', `${Math.max(MIN, Math.round(newW))}px`)
-      if (signY !== 0) this.applier.set(this.el, this.id, 'height', `${Math.max(MIN, Math.round(newH))}px`)
+
+      // 触底夹紧：尺寸不小于 MIN，同时锁住对应的 left/top 不越过对边
+      if (newW < MIN) { if (hasW) dLeft = this.startW - MIN; newW = MIN }
+      if (newH < MIN) { if (hasN) dTop = this.startH - MIN; newH = MIN }
+
+      if (hasE || hasW) this.applier.set(this.el, this.id, 'width', `${Math.round(newW)}px`)
+      if (hasS || hasN) this.applier.set(this.el, this.id, 'height', `${Math.round(newH)}px`)
+      if (hasW) this.applier.set(this.el, this.id, 'left', `${Math.round(this.startLeft + dLeft)}px`)
+      if (hasN) this.applier.set(this.el, this.id, 'top', `${Math.round(this.startTop + dTop)}px`)
       this.overlay.showSnapGuides(guides, this.host.iframe, z)
     }
     this.selection.reposition()
@@ -149,6 +182,8 @@ export class ResizeController {
         : [
             { prop: 'width', oldVal: this.oldW, newVal: this.el.style.width },
             { prop: 'height', oldVal: this.oldH, newVal: this.el.style.height },
+            { prop: 'left', oldVal: this.oldLeft, newVal: this.el.style.left },
+            { prop: 'top', oldVal: this.oldTop, newVal: this.el.style.top },
           ]
     const changed = changes.some((c) => c.oldVal !== c.newVal)
     if (changed) {
