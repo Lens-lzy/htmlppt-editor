@@ -18,12 +18,26 @@ export class SelectionController {
     private model: EditModel,
   ) {}
 
-  handleHover(el: HTMLElement | null): void {
+  handleHover(el: HTMLElement | null, x?: number, y?: number): void {
     if (!el || el.tagName === 'HTML' || el.tagName === 'BODY') {
       this.hovered = null
       this.overlay.showHover(null)
       return
     }
+    // PPTX：与点击同一套坐标命中逻辑——只高亮命中点的最小内容元素；点在页外（黑边/页间
+    // 空隙）或空白处则不高亮，避免两侧黑边出现整页大蓝框。
+    if (x != null && y != null && this.host.doc.querySelector('.slide')) {
+      const found = this.pickAtPoint(x, y)
+      if (!found || found === this.selected) {
+        this.hovered = null
+        this.overlay.showHover(null)
+        return
+      }
+      this.hovered = found
+      this.overlay.showHover(this.host.viewRect(found))
+      return
+    }
+    // HTML 编辑器：保持就近 closest 行为
     el = this.resolveUnit(el)
     if (el === this.selected) {
       this.overlay.showHover(null)

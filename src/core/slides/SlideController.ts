@@ -34,6 +34,11 @@ export class SlideController {
   get count(): number {
     return this.roots.length
   }
+
+  /** 当前页的根元素（新增元素插入到这里；无则回退到 body） */
+  get currentRoot(): HTMLElement | null {
+    return this.roots[this.current] || this.host.doc.body || null
+  }
   get detectMode(): SlideDetectMode {
     return this.mode
   }

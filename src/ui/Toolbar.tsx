@@ -164,6 +164,15 @@ export function Toolbar() {
       </div>
 
       <div class="hve-tb-group">
+        <button disabled={!loaded.value} onClick={() => core.addTextBox()} title="在当前页中央新增文本框">
+          🅣 文本框
+        </button>
+        <button disabled={!loaded.value} onClick={() => void core.addImage()} title="在当前页中央新增图片">
+          🖼 图片
+        </button>
+      </div>
+
+      <div class="hve-tb-group">
         <button disabled={!canUndo.value} onClick={() => core.undo()} title={`撤销 ${UNDO_KEY}`}>
           ↶ 撤销 <span class="hve-kbd">{UNDO_KEY}</span>
         </button>

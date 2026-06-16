@@ -121,7 +121,7 @@ export class EditorCore {
     this.slides = new SlideController(this.bus, this.host, this.history)
 
     // iframe 内交互 -> 控制器
-    this.host.onHover = (el) => !this.textEdit.editing && this.selection.handleHover(el)
+    this.host.onHover = (el, x, y) => !this.textEdit.editing && this.selection.handleHover(el, x, y)
     this.host.onClick = (el, e) => this.selection.handleClick(el, e.clientX, e.clientY)
     this.host.onDblClick = (el) => {
       this.selection.select(el)
@@ -650,6 +650,78 @@ export class EditorCore {
     this.selection.refresh()
   }
 
+  // ---------- 新增元素（文本框 / 图片，居中插入当前页） ----------
+
+  /** 在当前页中央新增一个默认文本框（双击编辑文字，四周缩放控制换行） */
+  addTextBox(): void {
+    const root = this.slides.currentRoot
+    if (!root) return
+    const doc = this.host.doc
+    const rw = root.clientWidth || 1280
+    const rh = root.clientHeight || 720
+    const W = Math.round(Math.min(420, rw * 0.5))
+    const H = Math.round(Math.min(120, rh * 0.2))
+    const left = Math.round((rw - W) / 2)
+    const top = Math.round((rh - H) / 2)
+    const box = doc.createElement('div')
+    box.className = 'el el-sp'
+    // 内联自包含样式：不依赖生成 deck 的 .el-tx/.pp（HTML 编辑器里也能用）
+    box.setAttribute(
+      'style',
+      `position:absolute;left:${left}px;top:${top}px;width:${W}px;height:${H}px;` +
+        `display:flex;align-items:center;justify-content:center;padding:8px;box-sizing:border-box`,
+    )
+    // 包一层子元素：让缩放走 size 模式（改 width/height 让文字换行），而非缩放字号
+    const inner = doc.createElement('div')
+    inner.setAttribute('style', 'width:100%;font-size:28px;line-height:1.3;color:#000;text-align:center')
+    inner.textContent = '双击编辑文字'
+    box.appendChild(inner)
+    this.insertElement(root, box, '新增文本框')
+  }
+
+  /** 选本地图片，在当前页中央新增一张图片（按页面 ~50% 适配尺寸，可拖动/缩放） */
+  async addImage(): Promise<void> {
+    const file = await pickFileViaInput('image/*')
+    if (!file) return
+    const dataUrl = await fileToDataUrl(file)
+    const dim = await imageSize(dataUrl)
+    const root = this.slides.currentRoot
+    if (!root) return
+    const doc = this.host.doc
+    const rw = root.clientWidth || 1280
+    const rh = root.clientHeight || 720
+    const scale = Math.min(1, (rw * 0.5) / dim.w, (rh * 0.6) / dim.h) || 1
+    const W = Math.max(16, Math.round(dim.w * scale))
+    const H = Math.max(16, Math.round(dim.h * scale))
+    const left = Math.round((rw - W) / 2)
+    const top = Math.round((rh - H) / 2)
+    const img = doc.createElement('img')
+    img.className = 'el el-pic'
+    img.src = dataUrl
+    img.setAttribute(
+      'style',
+      `position:absolute;left:${left}px;top:${top}px;width:${W}px;height:${H}px;object-fit:contain`,
+    )
+    this.insertElement(root, img, '新增图片')
+  }
+
+  /** 把新元素插入根节点（可撤销），并选中它 */
+  private insertElement(root: HTMLElement, el: HTMLElement, label: string): void {
+    ensureId(el)
+    this.history.exec(
+      new CallbackCommand(
+        label,
+        () => root.appendChild(el),
+        () => {
+          if (this.selection.selected === el) this.selection.deselect()
+          el.remove()
+        },
+      ),
+    )
+    this.dirty = true
+    this.selection.select(el)
+  }
+
   // ---------- 幻灯片 ----------
 
   detectSlides(mode: SlideDetectMode, selector?: string): void {
@@ -725,6 +797,26 @@ export class EditorCore {
     if (this.bundle) html = await this.bundle.rewriteHtmlString(html)
     await this.loadHtml(html, this.fileName)
   }
+}
+
+/** File -> dataURL（内嵌图片用） */
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader()
+    r.onload = () => res(r.result as string)
+    r.onerror = rej
+    r.readAsDataURL(file)
+  })
+}
+
+/** 读取图片原始像素尺寸 */
+function imageSize(url: string): Promise<{ w: number; h: number }> {
+  return new Promise((res) => {
+    const img = new Image()
+    img.onload = () => res({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 })
+    img.onerror = () => res({ w: 320, h: 240 })
+    img.src = url
+  })
 }
 
 /** 没有 File System Access API 时，用隐藏 <input> 选单个文件 */

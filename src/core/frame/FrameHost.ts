@@ -16,7 +16,7 @@ export class FrameHost {
   private interactive = true
   private rafPending = false
 
-  onHover?: (el: HTMLElement | null) => void
+  onHover?: (el: HTMLElement | null, x?: number, y?: number) => void
   onClick?: (el: HTMLElement, e: MouseEvent) => void
   onDblClick?: (el: HTMLElement, e: MouseEvent) => void
 
@@ -79,7 +79,7 @@ export class FrameHost {
       'mousemove',
       (e) => {
         if (!this.interactive) return
-        this.onHover?.(e.target as HTMLElement)
+        this.onHover?.(e.target as HTMLElement, e.clientX, e.clientY)
       },
       true,
     )
